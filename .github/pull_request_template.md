@@ -19,4 +19,3 @@
 - [ ] No raw athlete files are included
 - [ ] No names, account/activity IDs, exact timestamps, or coordinates are included
 - [ ] Test fixtures are synthetic and non-identifiable
-

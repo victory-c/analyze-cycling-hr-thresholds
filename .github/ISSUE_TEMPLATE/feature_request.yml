@@ -31,4 +31,3 @@ body:
       options:
         - label: This request contains no athlete-identifying or raw health data.
           required: true
-

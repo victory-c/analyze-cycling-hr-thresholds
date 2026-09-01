@@ -42,4 +42,3 @@ python /path/to/skill-creator/scripts/quick_validate.py .
 ## Bug reports
 
 Use the GitHub issue form, but do not upload raw FIT, GPX, TCX, XLSX, HTML, PDF, or JSON health exports. Describe the schema and error, then provide synthetic rows if needed.
-

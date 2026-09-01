@@ -41,4 +41,3 @@ body:
       options:
         - label: I removed all athlete-identifying and raw health data.
           required: true
-

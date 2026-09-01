@@ -183,4 +183,3 @@ This project supports training analysis; it is not a medical device and does not
 ## License
 
 [MIT](LICENSE)
-
