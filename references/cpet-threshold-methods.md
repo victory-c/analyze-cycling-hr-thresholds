@@ -72,3 +72,8 @@ For each threshold give the time, HR, supporting variables, sensitivity to smoot
 
 It is acceptable—and often correct—to identify VT1 but decline to identify LT2/RCP.
 
+## 8. Derive threshold-power evidence when field power is absent
+
+If a calibrated cycle ergometer recorded power, align its clock to the gas cart with the shared HR traces before extracting power at VT1 or RCP. Use all defensible threshold candidates across smoothing windows to form a central power and range. Do not trust a duplicated power channel merely because HR aligns.
+
+Preserve the label `pVT1`, `pLT2`, or `pRCP`. A power observed during a short-stage or continuous ramp includes protocol and metabolic-kinetics effects and is not automatically FTP. Follow [ftp-without-power-meter.md](ftp-without-power-meter.md) before offering an FTP proxy.

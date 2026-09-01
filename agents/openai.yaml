@@ -1,4 +1,4 @@
 interface:
-  display_name: "Cycling HR Threshold Analysis"
-  short_description: "Reconcile Garmin and CPET data into cycling HR zones"
-  default_prompt: "Use $analyze-cycling-hr-thresholds to independently analyze Garmin cycling history and CPET gas-exchange data, reconcile threshold conflicts, and produce defensible heart-rate zones."
+  display_name: "Cycling HR Threshold & FTP Analysis"
+  short_description: "Reconcile HR, CPET, and indirect FTP evidence"
+  default_prompt: "Use $analyze-cycling-hr-thresholds to reconcile Garmin and CPET evidence into cycling HR thresholds, zones, and a defensible FTP proxy when field power is unavailable."

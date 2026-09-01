@@ -52,6 +52,8 @@ Plot or tabulate HR by minute and five-minute block. Check:
 
 Power, when present, materially strengthens interpretation. With HR only, a rising HR trace may reflect rising effort, cardiovascular drift, or both.
 
+If field power is absent, do not regress watts directly from HR or speed. For a continuous climb with reliable mass, geometry, weather, surface, and time, follow [ftp-without-power-meter.md](ftp-without-power-meter.md) to estimate virtual power with explicit sensitivity bounds.
+
 ## 5. Form an independent field conclusion
 
 Report:
@@ -72,4 +74,3 @@ Official Garmin manuals describe the device's percentage-based zone behavior, bu
 
 - [Edge 540 heart-rate zones](https://www8.garmin.com/manuals/webhelp/GUID-17DE938E-466A-4746-BDBF-7A6FC1B3A32C/EN-GB/GUID-94A5A126-6BB2-47F6-8040-EAD29EC66C2B.html)
 - [Forerunner heart-rate zone settings](https://www8.garmin.com/manuals/webhelp/GUID-25E3235D-44D2-4384-A591-DD1D71BEBCB1/TR-TR/GUID-30C91919-943C-44E9-8048-901AC0881AEA.html)
-

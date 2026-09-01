@@ -8,6 +8,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from analyze_cpet import (  # noqa: E402
     align_hr,
+    classified_threshold_power_candidates,
     detect_thresholds,
     elapsed_seconds,
     excel_column_index,
@@ -54,7 +55,28 @@ class CpetAnalysisTests(unittest.TestCase):
         self.assertEqual(result["ergometer_time_minus_cart_time_seconds"], 7)
         self.assertGreater(result["correlation"], 0.99)
 
+    def test_threshold_power_candidates_remain_classified(self):
+        ergometer = pd.DataFrame(
+            {"hr": np.arange(100, 201), "power": np.arange(150, 251), "cadence": 85},
+            index=np.arange(0, 101),
+        )
+        sensitivity = [
+            {
+                "smoothing_seconds": 20,
+                "vt1_consensus_candidate_seconds": 20,
+                "rcp_consensus_candidate_seconds": 70,
+            },
+            {
+                "smoothing_seconds": 30,
+                "vt1_consensus_candidate_seconds": 22,
+                "rcp_consensus_candidate_seconds": 72,
+            },
+        ]
+        result = classified_threshold_power_candidates(ergometer, sensitivity, lag=5)
+        self.assertEqual(result["vt1"]["candidate_power_values_w"], [175.0, 177.0])
+        self.assertEqual(result["rcp"]["candidate_power_values_w"], [225.0, 227.0])
+        self.assertEqual(result["rcp"]["central_power_w"], 226.0)
+
 
 if __name__ == "__main__":
     unittest.main()
-
