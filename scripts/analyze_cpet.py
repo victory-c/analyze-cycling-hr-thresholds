@@ -314,6 +314,44 @@ def ergometer_values_at(
     return output
 
 
+def classified_threshold_power_candidates(
+    ergometer: pd.DataFrame,
+    sensitivity: list[dict[str, Any]],
+    lag: int,
+) -> dict[str, Any]:
+    """Keep VT1 and RCP power candidates separate across smoothing choices."""
+    output: dict[str, Any] = {}
+    for label, time_key in (
+        ("vt1", "vt1_consensus_candidate_seconds"),
+        ("rcp", "rcp_consensus_candidate_seconds"),
+    ):
+        candidates = []
+        for analysis in sensitivity:
+            cart_second = analysis.get(time_key)
+            if cart_second is None:
+                continue
+            ergo_second = int(cart_second) + lag
+            candidates.append(
+                {
+                    "smoothing_seconds": analysis.get("smoothing_seconds"),
+                    "cart_second": int(cart_second),
+                    "ergometer_second": ergo_second,
+                    "power_w": value_at(ergometer, "power", ergo_second),
+                    "hr_bpm": value_at(ergometer, "hr", ergo_second),
+                    "cadence_rpm": value_at(ergometer, "cadence", ergo_second),
+                }
+            )
+        powers = [row["power_w"] for row in candidates if row["power_w"] is not None]
+        output[label] = {
+            "candidates": candidates,
+            "candidate_power_values_w": powers,
+            "central_power_w": round(float(np.median(powers)), 1) if powers else None,
+            "candidate_range_w": [round(min(powers), 1), round(max(powers), 1)] if powers else None,
+            "warning": "Automatic candidates require physiological adjudication before use as pVT1/pRCP or an FTP proxy.",
+        }
+    return output
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gas-xlsx", type=Path, required=True)
@@ -385,6 +423,11 @@ def main() -> None:
             result["ergometer_values_at_candidate_times"] = ergometer_values_at(
                 ergo,
                 candidate_times,
+                alignment["ergometer_time_minus_cart_time_seconds"],
+            )
+            result["classified_threshold_power_candidates"] = classified_threshold_power_candidates(
+                ergo,
+                sensitivity,
                 alignment["ergometer_time_minus_cart_time_seconds"],
             )
 
