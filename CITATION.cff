@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this skill or its analysis utilities, cite the repository."
+title: "Cycling HR Threshold & FTP Analysis"
+type: software
+authors:
+  - name: "analyze-cycling-hr-thresholds contributors"
+repository-code: "https://github.com/victory-c/analyze-cycling-hr-thresholds"
+url: "https://github.com/victory-c/analyze-cycling-hr-thresholds"
+license: MIT

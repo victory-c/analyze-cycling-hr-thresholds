@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Methodology documentation
+    url: https://github.com/victory-c/analyze-cycling-hr-thresholds/tree/main/references
+    about: Review the existing threshold, FTP, and zone methodology before opening an issue.
