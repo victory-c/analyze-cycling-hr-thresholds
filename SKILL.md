@@ -1,11 +1,25 @@
 ---
 name: analyze-cycling-hr-thresholds
-description: Independently estimate cycling LTHR/LT2, VT1/GET, VT2/RCP, and—when no on-bike power meter exists—defensible FTP or threshold-power proxies from Garmin cycling history and/or raw CPET breath-by-breath files; audit sensor and protocol quality; reconcile field and laboratory evidence without blind averaging; and produce physiologically defensible HR zones plus Garmin-ready settings. Use for cycling threshold analysis, CPET interpretation, indirect FTP estimation, Garmin zone setup, or disagreements between lab and field thresholds.
+description: Estimate cycling LTHR/LT2, VT1/GET, VT2/RCP, and defensible FTP proxies from Garmin data, the official Strava MCP, or local activity and CPET files. Audit evidence quality, reconcile field and laboratory estimates, and calculate HR zones. Works in Claude and Codex through capability discovery; use for cycling threshold analysis, CPET interpretation, indirect FTP estimation, or Garmin HR-zone setup.
 ---
 
 # Analyze Cycling Heart-Rate Thresholds
 
 Estimate thresholds from each source independently, preserve uncertainty, and only then reconcile the results. Treat automated outputs as evidence summaries rather than diagnoses.
+
+## Client and source selection
+
+This skill uses ordinary Markdown and local Python helpers, with no required
+client-specific tool names. Read [client-and-source-routing.md](references/client-and-source-routing.md)
+to discover the current client's tools and select usable evidence. Read its
+connection section only when setting up or diagnosing an MCP connection.
+
+Use the capabilities actually available in the current session. A saved MCP
+configuration, a portable skill, and a working authenticated connection are
+different things. Use Garmin, Strava's official MCP, local files, or a subset;
+do not require both providers or a lab test to begin. Record unavailable sources
+and proceed with independent work. Fetch Strava data through the official
+connector only; do not assume it exposes raw streams or Garmin write tools.
 
 ## Non-negotiable rules
 
@@ -21,23 +35,24 @@ Estimate thresholds from each source independently, preserve uncertainty, and on
 ## Workflow
 
 1. Define the question and available sources. Distinguish LTHR/LT2, VT1/GET, VT2/RCP, HRmax, and operational zones.
-2. Audit Garmin data by following [garmin-data-workflow.md](references/garmin-data-workflow.md).
-3. Audit and analyze raw CPET data by following [cpet-threshold-methods.md](references/cpet-threshold-methods.md).
-4. Complete the two estimates independently before viewing or using the other source's numerical conclusion.
+2. If field data are available, follow [garmin-data-workflow.md](references/garmin-data-workflow.md); its quality checks also apply to timestamped local or official Strava evidence. Preserve provider-specific provenance.
+3. If raw CPET data are available, follow [cpet-threshold-methods.md](references/cpet-threshold-methods.md). Otherwise mark the laboratory evidence unavailable.
+4. When both field and laboratory data exist, complete their estimates independently before reconciliation. A Garmin activity and its synchronized Strava copy count as one effort, not two corroborating observations.
 5. Reconcile constructs and confidence using [reconciliation-and-zones.md](references/reconciliation-and-zones.md).
 6. If FTP is requested without an on-bike meter, follow [ftp-without-power-meter.md](references/ftp-without-power-meter.md) and preserve the directly supported construct.
 7. Calculate custom zones with `scripts/calculate_hr_zones.py`; use Garmin's fixed percentage model only as a comparison.
 8. Write the result using [report-contract.md](references/report-contract.md).
 
-## Garmin analysis
+## Field analysis
 
-- Enumerate the complete cycling history with pagination. Record activity type, date, duration, HR coverage, sensor type when available, temperature, laps, power availability, and duplication.
+- Enumerate the requested cycling date range with pagination. Record the coverage boundary and any unavailable pages; do not claim a complete history from a partial result. Record activity type, date, duration, HR coverage, sensor type when available, temperature, laps, power availability, and duplication.
 - Inspect raw FIT/HR records for the strongest sustained efforts instead of selecting by headline max HR.
 - Use repeated continuous best-window means, especially 20, 30, 40, and 60 minutes. Seek clustering across separate rides and conditions.
 - Treat configured HR-zone boundaries, FTP, max HR, and Garmin threshold values as metadata to verify, not observations.
 - If power is absent, state that workload stability and cardiac drift cannot be fully separated.
 - Do not infer watts from HR or speed alone. Use a controlled climb model only when mass, route geometry, time, wind/aerodynamic assumptions, surface, and pacing are defensible.
 - Use `scripts/analyze_field_hr.py` when Garmin/FIT data have been exported as JSON. Its results identify candidate efforts; an analyst must still judge terrain, pauses, heat, drift, and repeatability.
+- Activity summaries can select candidates but cannot reconstruct sustained-window HR, paired-power decoupling, or historical time in custom zones. Request suitable source files or mark those conclusions not identifiable when raw data are unavailable.
 
 ## Laboratory analysis
 
@@ -80,6 +95,12 @@ For Garmin, prefer custom BPM boundaries when the device permits them. A built-i
 
 ## Commands
 
+Resolve paths relative to this skill's directory, not the user's repository.
+The examples below assume that directory is the working directory; otherwise
+use absolute script paths. Use the available Python 3 interpreter or an existing
+environment. If a hosted client cannot run Python, use its available computation
+tools and disclose any omitted analyses; do not claim a helper was executed.
+
 Calculate zones and Garmin boundaries:
 
 ```bash
@@ -89,7 +110,7 @@ python scripts/calculate_hr_zones.py --vt1 150 --lthr 188 --max-hr 204 --format 
 Summarize exported field HR evidence:
 
 ```bash
-python scripts/analyze_field_hr.py --fit-json activity_a.json activity_b.json --windows-min 20 30 40 60
+python scripts/analyze_field_hr.py --fit-json activity_a.json activity_b.json --windows-min 20 30 40 60 --max-interpolation-gap-seconds 5
 ```
 
 Generate a first-pass CPET QC and breakpoint report:
@@ -114,4 +135,9 @@ python -m pip install -r scripts/requirements.txt
 
 ## Completion standard
 
-Do not call the analysis complete unless the report includes source-specific methods, data-quality findings, independent numerical estimates or explicit non-identifiability, reconciliation logic, BPM zones with calculation basis, confidence/ranges, key caveats, Garmin entry guidance, any requested FTP proxy with its direct construct and assumptions, and the single most informative follow-up test.
+Do not call the analysis complete unless the report includes source-specific methods, data-quality findings, independent numerical estimates or explicit non-identifiability, reconciliation logic, BPM zones with calculation basis when anchors are identifiable, confidence/ranges, key caveats, applicable device entry guidance, any requested FTP proxy with its direct construct and assumptions, and the single most informative follow-up test. Distinguish unavailable lab data from a negative lab finding. A completed report may conclude that the supplied evidence cannot identify a threshold.
+
+Analysis does not authorize account changes. When a Garmin write is requested,
+inspect its actual schema, preview the cycling-specific payload, apply only the
+authorized change, and read it back. The official Strava MCP is currently
+read-only; never route a zone update through it or infer a write tool exists.

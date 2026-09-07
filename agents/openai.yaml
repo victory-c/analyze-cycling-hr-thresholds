@@ -1,4 +1,4 @@
 interface:
   display_name: "Cycling HR Threshold & FTP Analysis"
-  short_description: "Reconcile HR, CPET, and indirect FTP evidence"
-  default_prompt: "Use $analyze-cycling-hr-thresholds to reconcile Garmin and CPET evidence into cycling HR thresholds, zones, and a defensible FTP proxy when field power is unavailable."
+  short_description: "Cycling HR, CPET, and FTP evidence in Claude or Codex"
+  default_prompt: "Use $analyze-cycling-hr-thresholds to analyze available Garmin, official Strava MCP, or local field and CPET evidence, reconcile cycling HR thresholds and zones, and estimate a defensible FTP proxy when supported."
