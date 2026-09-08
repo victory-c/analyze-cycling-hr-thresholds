@@ -43,12 +43,29 @@ class MetadataTests(unittest.TestCase):
         self.server.pop("issuer")
         self.assertEqual(classify(self.resource, self.server)["status"], "missing_issuer")
 
-    def test_http_or_other_host_token_endpoint_requires_review(self):
-        for url in ("http://www.strava.com/token", "https://example.com/token"):
-            with self.subTest(url=url):
-                self.server["token_endpoint"] = url
-                self.assertEqual(classify(self.resource, self.server)["status"],
-                                 "endpoint_changed_reinspect")
+    def test_http_or_other_host_endpoint_requires_review(self):
+        # Both endpoints are checked, not just token_endpoint: a hostile
+        # authorization_endpoint is what would actually send the user to an
+        # attacker's login page.
+        for field in ("token_endpoint", "authorization_endpoint"):
+            for url in ("http://www.strava.com/token", "https://example.com/token"):
+                with self.subTest(field=field, url=url):
+                    server = dict(self.server)
+                    server[field] = url
+                    self.assertEqual(classify(self.resource, server)["status"],
+                                     "endpoint_changed_reinspect")
+
+    def test_non_string_endpoint_is_reported_not_raised(self):
+        # urlsplit() on a list raises TypeError, which main() does not catch,
+        # so the guard here is what keeps a hostile document from replacing the
+        # JSON report with a traceback.
+        for field in ("token_endpoint", "authorization_endpoint"):
+            with self.subTest(field=field):
+                server = dict(self.server)
+                server[field] = ["https://www.strava.com/oauth/mcp/token"]
+                result = classify(self.resource, server)
+                self.assertEqual(result["status"], "missing_endpoint")
+                self.assertEqual(result["field"], field)
 
 
 if __name__ == "__main__":

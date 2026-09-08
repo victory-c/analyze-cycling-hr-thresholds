@@ -44,7 +44,15 @@ Check that timestamps are monotonic. Quantify coverage, median sample interval, 
 
 Use original timestamps and pause events for sustained-effort windows. An
 active-time axis may hide a long rest; never join efforts across that pause.
-For `analyze_field_hr.py`, pass `--max-interpolation-gap-seconds 5` explicitly.
+For `analyze_field_hr.py`, choose `--max-interpolation-gap-seconds` from the
+file's own sampling rather than from habit, and report the value used. The
+default of 12 suits Garmin smart recording, whose gaps are routinely 6-10 s;
+a tighter value such as 5 is appropriate only for true 1 s recording, and on
+smart-recorded files it splits every gap and returns null for the 20-60 min
+windows. A null window under a tight setting is a statement about sampling
+density, not evidence that the athlete has no sustained effort - widen the
+setting or say why you did not, instead of reporting the threshold as
+non-identifiable.
 The helper screens timestamped HR records; it does not itself decode FIT timer
 events or implement paired-power decoupling. Split at known pauses upstream and
 report the transformation. Prefer the provider's validated raw-timeline analysis

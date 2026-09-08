@@ -37,7 +37,7 @@ connector only; do not assume it exposes raw streams or Garmin write tools.
 1. Define the question and available sources. Distinguish LTHR/LT2, VT1/GET, VT2/RCP, HRmax, and operational zones.
 2. If field data are available, follow [garmin-data-workflow.md](references/garmin-data-workflow.md); its quality checks also apply to timestamped local or official Strava evidence. Preserve provider-specific provenance.
 3. If raw CPET data are available, follow [cpet-threshold-methods.md](references/cpet-threshold-methods.md). Otherwise mark the laboratory evidence unavailable.
-4. When both field and laboratory data exist, complete their estimates independently before reconciliation. A Garmin activity and its synchronized Strava copy count as one effort, not two corroborating observations.
+4. When both field and laboratory data exist, complete each estimate independently before viewing or using the other source's numerical conclusion. A Garmin activity and its synchronized Strava copy count as one effort, not two corroborating observations.
 5. Reconcile constructs and confidence using [reconciliation-and-zones.md](references/reconciliation-and-zones.md).
 6. If FTP is requested without an on-bike meter, follow [ftp-without-power-meter.md](references/ftp-without-power-meter.md) and preserve the directly supported construct.
 7. Calculate custom zones with `scripts/calculate_hr_zones.py`; use Garmin's fixed percentage model only as a comparison.
