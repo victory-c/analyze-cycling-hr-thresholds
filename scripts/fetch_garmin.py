@@ -141,6 +141,10 @@ class DirectGarminBackend:
         page_size = min(page_size, 200)
         items: list[dict[str, Any]] = []
         page = 0
+        # Why the walk stopped. None means "a short page proved the end of the
+        # list"; anything else means the inventory may be missing activities and
+        # must not be reported as complete.
+        truncated_by: str | None = None
         while max_pages is None or page < max_pages:
             params = {
                 "startDate": start_date,
@@ -150,20 +154,29 @@ class DirectGarminBackend:
             }
             if activity_type:
                 params["activityType"] = activity_type
-            batch = self.transport.connectapi(ACTIVITIES_ENDPOINT, params=params) or []
+            batch = self.transport.connectapi(ACTIVITIES_ENDPOINT, params=params)
+            if batch is None:
+                # Garmin answers 204/empty under throttling. An empty body is not
+                # proof that the history ended here, so stop and disclose it
+                # rather than coercing it to [] and claiming completeness.
+                truncated_by = "empty_response"
+                break
             if not isinstance(batch, list):
                 raise TypeError("Garmin activities endpoint returned a non-list payload")
             items.extend(item for item in batch if isinstance(item, dict))
             page += 1
             if len(batch) < page_size:
                 break
-        complete = not (max_pages is not None and page >= max_pages and len(batch) == page_size)
+        else:
+            # The loop ran out of allowance instead of reaching a short page.
+            truncated_by = "page_cap"
         return {
             "date_range": {"start": start_date, "end": end_date},
             "activity_type": activity_type or None,
             "page_size": page_size,
             "pages_fetched": page,
-            "complete": complete,
+            "complete": truncated_by is None,
+            "truncated_by": truncated_by,
             "count": len(items),
             "activities": items,
         }

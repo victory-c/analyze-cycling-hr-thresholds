@@ -44,6 +44,12 @@ class DirectBackendTests(unittest.TestCase):
         self.assertEqual(transport.calls[0][2]["params"]["start"], "0")
         self.assertEqual(transport.calls[1][2]["params"]["start"], "2")
         self.assertEqual(transport.calls[0][2]["params"]["activityType"], "cycling")
+        self.assertIsNone(result["truncated_by"])
+        # Without these the query would return the whole history while the
+        # envelope still advertised the requested window.
+        for call in transport.calls:
+            self.assertEqual(call[2]["params"]["startDate"], "2026-01-01")
+            self.assertEqual(call[2]["params"]["endDate"], "2026-08-31")
 
     def test_page_cap_is_disclosed_as_incomplete(self):
         transport = FakeTransport(responses=[[{"activityId": 1}]])
@@ -54,6 +60,29 @@ class DirectBackendTests(unittest.TestCase):
             max_pages=1,
         )
         self.assertFalse(result["complete"])
+        self.assertEqual(result["truncated_by"], "page_cap")
+
+    def test_empty_mid_stream_response_is_not_reported_as_complete(self):
+        """Garmin answers 204/empty under throttling; that is not end-of-list."""
+        transport = FakeTransport(responses=[[{"activityId": 1}, {"activityId": 2}], None])
+        result = garmin.DirectGarminBackend(transport).activities(
+            start_date="2026-01-01",
+            end_date="2026-08-31",
+            page_size=2,
+        )
+        self.assertEqual(result["count"], 2)
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["truncated_by"], "empty_response")
+
+    def test_error_object_payload_is_rejected_not_counted_as_empty(self):
+        """A truthy non-list (e.g. {"errorMessage": ...}) must not read as 0 activities."""
+        transport = FakeTransport(responses=[{"errorMessage": "token expired"}])
+        with self.assertRaises(TypeError):
+            garmin.DirectGarminBackend(transport).activities(
+                start_date="2026-01-01",
+                end_date="2026-08-31",
+                page_size=2,
+            )
 
     def test_explicit_read_only_endpoints(self):
         transport = FakeTransport(responses=[{}, {}, {}, {}])
@@ -127,10 +156,22 @@ class ContractTests(unittest.TestCase):
             garmin._write_json({"ok": True}, output)
             self.assertEqual(json.loads(output.read_text()), {"ok": True})
 
-    def test_parser_has_no_password_option(self):
-        help_text = garmin.build_parser().format_help()
-        self.assertNotIn("--password", help_text)
-        self.assertNotIn("--email", help_text)
+    def test_no_subcommand_accepts_a_credential_flag(self):
+        parser = garmin.build_parser()
+        parsers = [parser]
+        for action in parser._actions:
+            subparsers = getattr(action, "choices", None)
+            if isinstance(subparsers, dict):
+                parsers.extend(subparsers.values())
+        self.assertGreater(len(parsers), 1, "expected subcommands to be discovered")
+        banned = ("--password", "--email", "--passwd", "--pass", "--secret", "--token")
+        for candidate in parsers:
+            for option in candidate._option_string_actions:
+                self.assertNotIn(
+                    option.lower(),
+                    banned,
+                    f"credential-shaped flag {option} on {candidate.prog}",
+                )
 
 
 if __name__ == "__main__":
