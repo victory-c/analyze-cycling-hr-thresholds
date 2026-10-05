@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Summarize sustained HR evidence from Garmin/FIT JSON exports or Strava MCP streams.
+"""Summarize sustained HR evidence from FIT files or JSON activity exports.
+
+Accepts FIT files (raw, gzip as in Strava bulk exports, or zip as in Garmin
+exports), JSON record lists, and JSON stream arrays from the Strava MCP,
+intervals.icu, or the Strava REST API.
 
 This utility finds auditable candidate efforts. It does not declare LTHR or VT1.
 """
@@ -8,15 +12,19 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+import gzip
+from io import BytesIO
 import json
 import math
 from pathlib import Path
+import zipfile
 from statistics import fmean, median
 from typing import Any, Iterable
 
 
 TIME_KEYS = ("timestamp", "time", "dateTime", "startTime", "elapsed_time", "elapsedTime")
-HR_KEYS = ("heart_rate", "heartRate", "hr", "HeartRate", "HR")
+HR_KEYS = ("heart_rate", "heartRate", "heartrate", "hr", "HeartRate", "HR")
+HR_SUMMARY_KEYS = ("averageHR", "averageHeartRate", "maxHR", "maxHeartRate", "average_heartrate", "max_heartrate")
 
 
 def unwrap(value: Any) -> Any:
@@ -41,6 +49,8 @@ def unwrap(value: Any) -> Any:
 def parse_time(value: Any) -> float | None:
     if value is None:
         return None
+    if isinstance(value, datetime):
+        return value.timestamp()
     if isinstance(value, (int, float)) and math.isfinite(float(value)):
         return float(value)
     text = str(value).strip()
@@ -87,7 +97,23 @@ def find_record_lists(value: Any) -> list[list[dict[str, Any]]]:
 
 
 def first_list(node: dict[str, Any], keys: tuple[str, ...]) -> list[Any] | None:
-    return next((node[key] for key in keys if isinstance(node.get(key), list)), None)
+    for key in keys:
+        value = node.get(key)
+        if isinstance(value, dict):  # Strava REST key_by_type: {"heartrate": {"data": [...]}}
+            value = value.get("data")
+        if isinstance(value, list):
+            return value
+    return None
+
+
+def stream_columns(node: list[Any]) -> dict[str, list[Any]] | None:
+    """Turn a [{"type": "heartrate", "data": [...]}, ...] list (intervals.icu, Strava REST) into columns."""
+    if node and all(
+        isinstance(item, dict) and isinstance(item.get("type"), str) and isinstance(item.get("data"), list)
+        for item in node
+    ):
+        return {item["type"]: item["data"] for item in node}
+    return None
 
 
 def find_parallel_streams(value: Any) -> list[tuple[list[Any], list[Any]]]:
@@ -105,6 +131,10 @@ def find_parallel_streams(value: Any) -> list[tuple[list[Any], list[Any]]]:
             for child in node.values():
                 walk(child)
         elif isinstance(node, list):
+            columns = stream_columns(node)
+            if columns is not None:
+                walk(columns)
+                return
             for item in node:
                 walk(item)
 
@@ -129,9 +159,85 @@ def raw_samples(payload: Any) -> list[tuple[Any, Any]]:
     return []
 
 
+def unpack_container(data: bytes) -> bytes:
+    """Return the payload inside gzip (Strava bulk export) or zip (Garmin export) wrappers."""
+    if data[:2] == b"\x1f\x8b":
+        return gzip.decompress(data)
+    if data[:4] == b"PK\x03\x04":
+        with zipfile.ZipFile(BytesIO(data)) as archive:
+            members = [name for name in archive.namelist() if name.lower().endswith(".fit")]
+            if len(members) != 1:
+                raise ValueError(f"expected exactly one .fit file in the zip archive, found {len(members)}")
+            return archive.read(members[0])
+    return data
+
+
+def is_fit(data: bytes) -> bool:
+    return len(data) >= 12 and data[8:12] == b".FIT"
+
+
+def fit_samples(data: bytes) -> tuple[list[tuple[Any, Any]], dict[str, Any]]:
+    """Decode FIT records, keeping records inside cycling or unlabeled sessions."""
+    try:
+        from garmin_fit_sdk import Decoder, Stream
+    except ImportError as error:
+        raise RuntimeError(
+            "decoding FIT files requires garmin-fit-sdk: python -m pip install -r scripts/requirements.txt"
+        ) from error
+    messages, errors = Decoder(Stream.from_byte_array(bytearray(data))).read()
+    records = messages.get("record_mesgs", [])
+    sessions = messages.get("session_mesgs", [])
+    metadata: dict[str, Any] = {
+        "input_format": "fit",
+        "fit_sessions": [{"sport": s.get("sport"), "sub_sport": s.get("sub_sport")} for s in sessions],
+    }
+    if errors:
+        # Partially recorded files are common; keep what decoded, but surface the integrity problem.
+        metadata["fit_decode_warnings"] = [f"decoding stopped early; file may be truncated or corrupt: {error}" for error in errors]
+    cycling = [s for s in sessions if s.get("sport") == "cycling"]
+    # Several non-Garmin head units (e.g. Magene in navigation mode) label rides "generic".
+    unknown = [s for s in sessions if s.get("sport") in (None, "generic")]
+    kept = cycling or unknown
+    if sessions and not kept:
+        found = sorted({str(s["sport"]) for s in sessions})
+        raise ValueError(f"FIT file has no cycling session (found: {', '.join(found)})")
+    if not cycling:
+        metadata["sport_warning"] = "FIT sport is generic or missing; confirm the activity was a ride"
+    if kept:
+        windows = []
+        for session in kept:
+            start = parse_time(session.get("start_time"))
+            elapsed = numeric(session.get("total_elapsed_time"))
+            if start is not None and elapsed is not None:
+                windows.append((start, start + elapsed))
+        if windows:
+            # Multisport files also contain swim/run legs; their HR is not cycling evidence.
+            def in_kept_session(record: dict[str, Any]) -> bool:
+                moment = parse_time(record.get("timestamp"))
+                return moment is not None and any(start <= moment <= end for start, end in windows)
+
+            records = [record for record in records if in_kept_session(record)]
+    return [(record.get("timestamp"), record.get("heart_rate")) for record in records], metadata
+
+
+def load_samples(path: Path) -> tuple[list[tuple[Any, Any]], dict[str, Any]]:
+    data = unpack_container(path.read_bytes())
+    if is_fit(data):
+        return fit_samples(data)
+    try:
+        payload = json.loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("unsupported file format; expected FIT or JSON") from error
+    return raw_samples(payload), {"input_format": "json"}
+
+
 def extract_points(payload: Any) -> list[tuple[float, float]]:
+    return normalize_points(raw_samples(payload))
+
+
+def normalize_points(samples: Iterable[tuple[Any, Any]]) -> list[tuple[float, float]]:
     points = []
-    for raw_time, raw_hr in raw_samples(payload):
+    for raw_time, raw_hr in samples:
         timestamp = parse_time(raw_time)
         hr = numeric(raw_hr)
         if timestamp is not None and hr is not None and 25 <= hr <= 260:
@@ -195,15 +301,19 @@ def best_window(runs: Iterable[list[float]], seconds: int) -> dict[str, float] |
 
 
 def summarize_file(path: Path, windows: list[int], max_gap: int) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    points = extract_points(payload)
+    try:
+        samples, metadata = load_samples(path)
+    except (OSError, RuntimeError, ValueError, zipfile.BadZipFile) as error:
+        return {"file": path.name, "error": str(error)}
+    points = normalize_points(samples)
     if not points:
-        return {"file": path.name, "error": "no timestamped HR records or aligned time/HR streams found"}
+        return {"file": path.name, **metadata, "error": "no timestamped HR records or aligned time/HR streams found"}
     gaps = [b[0] - a[0] for a, b in zip(points, points[1:]) if b[0] > a[0]]
     runs = interpolate_seconds(points, max_gap=max_gap)
     values = [hr for _, hr in points]
     return {
         "file": path.name,
+        **metadata,
         "raw_hr_samples": len(points),
         "elapsed_seconds": round(points[-1][0], 1),
         "hr_min_bpm": round(min(values), 1),
@@ -232,14 +342,18 @@ def inventory_activity_list(path: Path) -> dict[str, Any]:
     sports: dict[str, int] = {}
     with_hr = 0
     with_power = 0
+    strava_stubs = 0
     for item in activities:
         sport = str(item.get("activityType") or item.get("sport") or item.get("sport_type") or item.get("type") or "unknown")
         sports[sport] = sports.get(sport, 0) + 1
-        if any(numeric(item.get(key)) is not None for key in ("averageHR", "averageHeartRate", "maxHR", "maxHeartRate")):
+        if item.get("has_heartrate") is True or any(numeric(item.get(key)) is not None for key in HR_SUMMARY_KEYS):
             with_hr += 1
-        if any(numeric(item.get(key)) is not None for key in ("averagePower", "normalizedPower", "maxPower")):
+        # device_watts separates measured power from Strava/intervals.icu estimates.
+        if item.get("device_watts") is True or any(numeric(item.get(key)) is not None for key in ("averagePower", "normalizedPower", "maxPower")):
             with_power += 1
-    return {
+        if item.get("source") == "STRAVA":
+            strava_stubs += 1
+    result: dict[str, Any] = {
         "file": path.name,
         "activity_count": len(activities),
         "sports": sports,
@@ -247,18 +361,29 @@ def inventory_activity_list(path: Path) -> dict[str, Any]:
         "activities_with_summary_power": with_power,
         "caveat": "Completeness still depends on API pagination and duplicate filtering.",
     }
+    if strava_stubs:
+        result["strava_sourced_stubs"] = strava_stubs
+        result["strava_stub_warning"] = (
+            "intervals.icu returns empty stubs for activities it received from Strava; "
+            "sync those rides to intervals.icu from the device platform or use the original files."
+        )
+    return result
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--activity",
         "--fit-json",
+        dest="activity_files",
         nargs="+",
         type=Path,
         required=True,
-        help="JSON exports containing timestamped HR records or Strava MCP time/heart_rate streams",
+        help="FIT (.fit, .fit.gz, Garmin .zip) or JSON files with timestamped HR records or time/HR streams",
     )
-    parser.add_argument("--activity-list-json", type=Path, help="optional Garmin or Strava activity-list export")
+    parser.add_argument(
+        "--activity-list-json", type=Path, help="optional Garmin, Strava, or intervals.icu activity-list export"
+    )
     parser.add_argument("--windows-min", nargs="+", type=int, default=[20, 30, 40, 60])
     parser.add_argument("--max-interpolation-gap-seconds", type=int, default=12)
     parser.add_argument("--output-json", type=Path)
@@ -269,7 +394,7 @@ def main() -> None:
         "purpose": "field HR evidence inventory; not an automatic threshold diagnosis",
         "activities": [
             summarize_file(path, args.windows_min, args.max_interpolation_gap_seconds)
-            for path in args.fit_json
+            for path in args.activity_files
         ],
     }
     if args.activity_list_json:

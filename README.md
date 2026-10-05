@@ -43,7 +43,7 @@ git clone https://github.com/victory-c/analyze-cycling-hr-thresholds.git \
   "${CODEX_HOME:-$HOME/.codex}/skills/analyze-cycling-hr-thresholds"
 ```
 
-Install Python dependencies used by the CPET analyzer:
+Install Python dependencies used by the CPET analyzer and FIT decoding:
 
 ```bash
 cd "${CODEX_HOME:-$HOME/.codex}/skills/analyze-cycling-hr-thresholds"
@@ -84,7 +84,15 @@ python scripts/analyze_field_hr.py \
 
 The output ranks sustained HR windows as candidate evidence. It does not automatically diagnose LTHR.
 
-It also reads the column-oriented streams returned by the official Strava MCP's `get_activity_streams` tool, for example `{"time": [...], "heart_rate": [...]}`. Request `time` and `heart_rate` without `resolution`: downsampled streams leave gaps that the analyzer deliberately will not bridge. `--activity-list-json` also accepts Strava's `list_activities` output.
+`--activity` (alias `--fit-json`) also accepts original FIT files from any head unit, including Strava bulk-export `.fit.gz` files and Garmin "Export Original" `.zip` files, as well as stream JSON from the official Strava MCP, the intervals.icu API, and the Strava REST API:
+
+```bash
+python scripts/analyze_field_hr.py \
+  --activity ride.fit strava_streams.json intervals_streams.json \
+  --windows-min 20 30 40 60
+```
+
+Request Strava MCP streams without `resolution`: downsampled streams leave gaps that the analyzer deliberately will not bridge. intervals.icu returns empty stubs for activities that it imported from Strava. See [activity inputs](references/garmin-data-workflow.md#activity-inputs-for-the-field-helper) for each source.
 
 ### Analyze raw CPET workbooks
 
