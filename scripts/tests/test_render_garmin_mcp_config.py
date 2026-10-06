@@ -6,10 +6,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from render_garmin_mcp_config import ANALYSIS_TOOLS, render
 
+PINNED_SOURCE = "git+https://example.test/garmin_mcp.git@" + "a" * 40
+
 
 class McpConfigTests(unittest.TestCase):
     def test_generic_config_is_stdio_and_has_read_only_analysis_allowlist(self):
-        config = json.loads(render("generic", "git+https://example.test/garmin_mcp"))
+        config = json.loads(render("generic", PINNED_SOURCE))
         self.assertEqual(config["transport"], "stdio")
         self.assertEqual(config["command"], "uvx")
         allowlist = config["env"]["GARMIN_ENABLED_TOOLS"].split(",")
@@ -22,7 +24,7 @@ class McpConfigTests(unittest.TestCase):
         self.assertNotIn("", allowlist)
 
     def test_mcp_json_wraps_server(self):
-        config = json.loads(render("mcp-json", "source"))
+        config = json.loads(render("mcp-json", PINNED_SOURCE))
         self.assertIn("garmin", config["mcpServers"])
         server = config["mcpServers"]["garmin"]
         self.assertEqual(server["command"], "uvx")
@@ -35,22 +37,23 @@ class McpConfigTests(unittest.TestCase):
         joined = ",".join(ANALYSIS_TOOLS)
         for client in ("generic", "mcp-json", "codex", "opencode"):
             with self.subTest(client=client):
-                self.assertIn(joined, render(client, "source"))
+                self.assertIn(joined, render(client, PINNED_SOURCE))
+                self.assertIn(PINNED_SOURCE, render(client, PINNED_SOURCE))
 
     def test_opencode_uses_command_array(self):
-        config = json.loads(render("opencode", "source", is_cn=True))
+        config = json.loads(render("opencode", PINNED_SOURCE, is_cn=True))
         server = config["mcp"]["servers"]["garmin"]
         self.assertEqual(server["command"][0], "uvx")
         self.assertEqual(server["environment"]["GARMIN_IS_CN"], "true")
 
     def test_codex_output_is_toml_shaped(self):
-        rendered = render("codex", "source")
+        rendered = render("codex", PINNED_SOURCE)
         self.assertIn("[mcp_servers.garmin]", rendered)
         self.assertIn('command = "uvx"', rendered)
         # Assert the env table is actually emitted, rather than asserting the
         # absence of a string the module can never produce.
         self.assertIn("GARMIN_ENABLED_TOOLS", rendered)
-        multi = render("codex", "source", is_cn=True)
+        multi = render("codex", PINNED_SOURCE, is_cn=True)
         self.assertIn('GARMIN_IS_CN = "true"', multi)
 
 

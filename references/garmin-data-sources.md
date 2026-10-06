@@ -49,7 +49,7 @@ The allowlist excludes the server's edit, create, upload, scheduling, and delete
 Use Python 3.12 and authenticate before starting the MCP client:
 
 ```bash
-uvx --python 3.12 --from git+https://github.com/Taxuspt/garmin_mcp garmin-mcp-auth
+uvx --python 3.12 --from 'git+https://github.com/Taxuspt/garmin_mcp.git@<reviewed-40-character-commit-sha>' garmin-mcp-auth
 ```
 
 The upstream tool stores tokens locally under `~/.garminconnect` by default. Do not put `GARMIN_EMAIL` or `GARMIN_PASSWORD` in an agent configuration. Treat the token store like a password.
@@ -59,10 +59,10 @@ The upstream tool stores tokens locally under `~/.garminconnect` by default. Do 
 The renderer prints configuration; it does not edit global files:
 
 ```bash
-python scripts/render_garmin_mcp_config.py --client generic
-python scripts/render_garmin_mcp_config.py --client mcp-json
-python scripts/render_garmin_mcp_config.py --client codex
-python scripts/render_garmin_mcp_config.py --client opencode
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client generic
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client mcp-json
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client codex
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client opencode
 ```
 
 `mcp-json` emits the common `mcpServers` shape used by several desktop and editor clients. `generic` emits the transport-neutral server record. `opencode` follows the current `mcp.servers` local-server schema in the official [OpenCode MCP documentation](https://opencode.ai/v2/docs/mcp-servers). Register the generated local stdio server using the coding agent's own MCP settings. For Codex, the official [MCP documentation](https://developers.openai.com/codex/mcp/) describes both CLI and `config.toml` registration.

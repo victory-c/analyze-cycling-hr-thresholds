@@ -140,19 +140,19 @@ Garmin's official [Activity API](https://developer.garmin.com/gc-developer-progr
 Authenticate locally once, without putting a password in the agent configuration:
 
 ```bash
-uvx --python 3.12 --from git+https://github.com/Taxuspt/garmin_mcp garmin-mcp-auth
+uvx --python 3.12 --from 'git+https://github.com/Taxuspt/garmin_mcp.git@<reviewed-40-character-commit-sha>' garmin-mcp-auth
 ```
 
 Render a minimal read-only MCP configuration:
 
 ```bash
-python scripts/render_garmin_mcp_config.py --client generic
-python scripts/render_garmin_mcp_config.py --client mcp-json
-python scripts/render_garmin_mcp_config.py --client codex
-python scripts/render_garmin_mcp_config.py --client opencode
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client generic
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client mcp-json
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client codex
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client opencode
 ```
 
-The renderer only prints configuration and never edits global settings. The allowlist excludes Garmin write tools.
+The renderer requires a reviewed full 40-character upstream commit SHA (`--revision`) and only prints configuration; it never edits global settings. Do not run the MCP/auth commands until you have selected and reviewed that immutable upstream revision. The allowlist excludes Garmin write tools.
 
 ### Option B: direct read-only API CLI
 

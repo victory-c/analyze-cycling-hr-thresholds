@@ -119,7 +119,7 @@ python scripts/analyze_field_hr.py --fit-json activity_a.json activity_b.json --
 Generate a minimal `garmin_mcp` configuration for an MCP client:
 
 ```bash
-python scripts/render_garmin_mcp_config.py --client generic
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client generic
 ```
 
 Or acquire the same Garmin source through the direct read-only CLI (Python 3.12+):

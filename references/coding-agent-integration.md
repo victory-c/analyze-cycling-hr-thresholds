@@ -30,13 +30,13 @@ All MCP clients need the same server process:
 ```text
 transport: stdio
 command: uvx
-args: --python 3.12 --from git+https://github.com/Taxuspt/garmin_mcp garmin-mcp
+args: --python 3.12 --from git+https://github.com/Taxuspt/garmin_mcp.git@<reviewed-40-character-commit-sha> garmin-mcp
 ```
 
 Generate the surrounding client-specific shape with:
 
 ```bash
-python scripts/render_garmin_mcp_config.py --client generic
+python scripts/render_garmin_mcp_config.py --revision <reviewed-40-character-commit-sha> --client generic
 ```
 
 The `mcp-json`, `codex`, and `opencode` render targets are conveniences. For any other agent, translate only the outer configuration syntax; keep the command, arguments, read-only tool allowlist, and absence of passwords unchanged.

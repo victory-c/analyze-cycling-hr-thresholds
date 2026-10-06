@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 
-DEFAULT_SOURCE = "git+https://github.com/Taxuspt/garmin_mcp"
+REPOSITORY = "git+https://github.com/Taxuspt/garmin_mcp.git"
 ANALYSIS_TOOLS = (
     "get_activities_by_date",
     "get_activities",
@@ -78,10 +79,17 @@ def main() -> None:
         choices=("generic", "mcp-json", "codex", "opencode"),
         default="generic",
     )
-    parser.add_argument("--source", default=DEFAULT_SOURCE)
+    parser.add_argument(
+        "--revision",
+        required=True,
+        help="reviewed full 40-character garmin_mcp commit SHA",
+    )
     parser.add_argument("--cn", action="store_true")
     args = parser.parse_args()
-    print(render(args.client, args.source, is_cn=args.cn), end="")
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", args.revision):
+        parser.error("--revision must be a full 40-character commit SHA")
+    source = f"{REPOSITORY}@{args.revision.lower()}"
+    print(render(args.client, source, is_cn=args.cn), end="")
 
 
 if __name__ == "__main__":
