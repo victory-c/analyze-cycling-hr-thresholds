@@ -1,12 +1,27 @@
-# Garmin field-data workflow
+# Field-data workflow (Garmin, official Strava MCP, or local files)
 
 ## Goal
 
 Estimate cycling LTHR/LT2 evidence from sustained field HR, independently of the laboratory result. Garmin data usually cannot locate VT1 confidently unless workload was controlled and power, lactate, gas exchange, or a validated surrogate was recorded.
 
+First choose an acquisition backend using [garmin-data-sources.md](garmin-data-sources.md). MCP and direct API acquisition are interchangeable transports for this one Garmin source; never treat their agreement as independent validation.
+
 ## 1. Build a complete inventory
 
-Paginate through the entire activity history. Retain cycling subtypes and identify indoor/outdoor duplicates, multisport legs, recordings with zero duration, and activities with no HR.
+Paginate through the requested date range; use the full history only when it is in scope. Report the covered interval and incomplete pagination. Retain cycling subtypes and identify indoor/outdoor duplicates, multisport legs, recordings with zero duration, and activities with no HR.
+
+First discover the available tools using [client-and-source-routing.md](client-and-source-routing.md).
+Never infer that the official Strava MCP exposes the same endpoints as Garmin
+or the Strava REST API. If it provides only summary data, screen candidates and
+continue detailed analysis from available Garmin records or user-provided files.
+Mark unsupported measurements as missing instead of fabricating a time series.
+
+Use provider-qualified activity identifiers internally. Match synchronized
+copies using original file identity when available, otherwise start time, sport,
+duration, distance, and recording context. Inspect ambiguous matches. Two
+platforms holding the same ride are not independent threshold evidence. Keep
+the most informative trace with links to its provenance; do not concatenate
+duplicate streams.
 
 For each usable activity capture:
 
@@ -17,6 +32,10 @@ For each usable activity capture:
 - laps, temperature, elevation, cadence, speed, and power availability;
 - Garmin-set max HR, resting HR, zones, FTP, threshold, and the sport to which each derived metric applies.
 
+Capture fields only when exposed. Missing Garmin-only profile metadata must not
+block field analysis from other sources. Distinguish environmental weather from
+device temperature, measured from estimated power, and elapsed from active time.
+
 Do not interpret a configured boundary as measured evidence. A user's zones may have changed during the history, and historical time-in-zone summaries may therefore be incomparable.
 
 ## 2. Screen data quality
@@ -24,6 +43,22 @@ Do not interpret a configured boundary as measured evidence. A user's zones may 
 Prefer chest-strap HR for threshold work. Optical HR can be usable, but flag cadence lock, sudden step changes, implausible plateaus, dropouts, and spikes. Preserve the actual sensor provenance as unknown if the export does not prove it.
 
 Check that timestamps are monotonic. Quantify coverage, median sample interval, long gaps, and interpolation. Garmin smart recording may be irregular; do not fill long gaps as though HR were continuously observed.
+
+Use original timestamps and pause events for sustained-effort windows. An
+active-time axis may hide a long rest; never join efforts across that pause.
+For `analyze_field_hr.py`, choose `--max-interpolation-gap-seconds` from the
+file's own sampling rather than from habit, and report the value used. The
+default of 12 suits Garmin smart recording, whose gaps are routinely 6-10 s;
+a tighter value such as 5 is appropriate only for true 1 s recording, and on
+smart-recorded files it splits every gap and returns null for the 20-60 min
+windows. A null window under a tight setting is a statement about sampling
+density, not evidence that the athlete has no sustained effort - widen the
+setting or say why you did not, instead of reporting the threshold as
+non-identifiable.
+The helper screens timestamped HR records; it does not itself decode FIT timer
+events or implement paired-power decoupling. Split at known pauses upstream and
+report the transformation. Prefer the provider's validated raw-timeline analysis
+when available. Never treat a 30-second summary bin as a one-second observation.
 
 Heat, dehydration, fatigue, altitude, stimulants, illness, and accumulated cardiac drift can elevate HR for a given workload. They are reasons to interpret a ride in context, not automatic reasons to discard it.
 
