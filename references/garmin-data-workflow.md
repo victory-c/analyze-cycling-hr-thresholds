@@ -109,3 +109,17 @@ Official Garmin manuals describe the device's percentage-based zone behavior, bu
 
 - [Edge 540 heart-rate zones](https://www8.garmin.com/manuals/webhelp/GUID-17DE938E-466A-4746-BDBF-7A6FC1B3A32C/EN-GB/GUID-94A5A126-6BB2-47F6-8040-EAD29EC66C2B.html)
 - [Forerunner heart-rate zone settings](https://www8.garmin.com/manuals/webhelp/GUID-25E3235D-44D2-4384-A591-DD1D71BEBCB1/TR-TR/GUID-30C91919-943C-44E9-8048-901AC0881AEA.html)
+
+## Activity inputs for the field helper
+
+Pass activity files to `scripts/analyze_field_hr.py --activity` (alias `--fit-json`). The format is detected from content, not the file extension.
+
+| Source | What to pass | Notes |
+|---|---|---|
+| Any FIT-recording device (Garmin, Magene, Wahoo, Zwift, …) | The original `.fit`, a Strava bulk-export `.fit.gz`, or a Garmin "Export Original" `.zip` | Needs `garmin-fit-sdk`. Only records inside cycling sessions are kept, so multisport swim/run legs are dropped. Sessions labelled `generic` (common on non-Garmin head units) are kept with a `sport_warning`; confirm that the activity was a ride. Files that declare only other sports are rejected. `fit_decode_warnings` flags truncated or corrupt recordings. |
+| Official Strava MCP | A saved `get_activity_streams` result containing `time` and `heart_rate` | Omit `resolution`; downsampled streams leave gaps that are deliberately not bridged. |
+| intervals.icu API | `GET /api/v1/activity/{id}/streams.json?types=time,heartrate,watts`, or the original file from `GET /api/v1/activity/{id}/file` | Uses Basic auth with username `API_KEY`. The account holder configures the key; never request it in chat. Activities that intervals.icu received from Strava are returned as empty stubs, and `--activity-list-json` counts them as `strava_sourced_stubs`. |
+| Strava REST API | Stream lists, with or without `key_by_type` | Strava `average_watts` may be estimated; use `device_watts` to identify measured power. |
+| Garmin MCP or JSON exports | Records with a timestamp and HR | |
+
+Streams of unequal length are rejected rather than aligned by guesswork. GPX and TCX are not read directly. A ride synchronized to several platforms remains a single effort.

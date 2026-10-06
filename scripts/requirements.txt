@@ -1,4 +1,4 @@
+garmin-fit-sdk>=21.217
 numpy>=1.24
 openpyxl>=3.1
 pandas>=2.0
-
