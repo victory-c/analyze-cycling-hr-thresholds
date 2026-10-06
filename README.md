@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 
-A reusable, coding-agent-neutral skill and CLI toolkit for reconciling Garmin field data and raw cycling CPET gas-exchange data into defensible heart-rate thresholds, training zones, and—when no on-bike power meter exists—carefully labeled FTP proxies.
+A reusable skill and CLI toolkit for **Claude, Codex, and other coding agents**, using Garmin data (MCP, a direct read-only CLI, or exports), the **official Strava MCP**, or local activity and cycling CPET files to produce defensible heart-rate thresholds, training zones, and—when no on-bike power meter exists—carefully labeled FTP proxies.
 
 The central principle is simple: analyze every source independently, audit its validity, and reconcile physiological constructs rather than averaging numbers that merely have similar labels.
 
@@ -20,6 +20,7 @@ The central principle is simple: analyze every source independently, audit its v
   - controlled-climb physics;
   - multi-duration critical-power fitting.
 - Reports confidence, plausible ranges, disagreements, and the single most useful follow-up test.
+- Discovers the current client's tools without hard-coded provider prefixes; supports field-only or lab-only analysis and avoids counting synchronized Garmin/Strava copies as independent efforts.
 - Acquires Garmin evidence through either:
   - [`Taxuspt/garmin_mcp`](https://github.com/Taxuspt/garmin_mcp) for MCP-capable agents; or
   - an explicit read-only Garmin Connect API CLI for any agent that can execute Python and read JSON.
@@ -36,13 +37,16 @@ This project deliberately refuses several tempting shortcuts:
 - It does not default to `95% × 20-minute power` for an individual athlete.
 - It does not publish names, coordinates, activity IDs, or raw health files.
 
-## Use with coding agents
+## Install
 
-`SKILL.md` is the canonical workflow, `AGENTS.md` is a compact repository instruction, and every analysis/data-acquisition utility is an ordinary Python CLI. The repository therefore works with Codex, Claude Code/Desktop, Cursor, Cline, OpenCode, other MCP clients, IDE agents, CI workers, and a plain shell.
+The same skill folder works in Claude and Codex. Choose the installation below for
+your client; installing the skill does **not** connect an account or grant access
+to health data. If the target folder already exists, review its changes before
+updating it instead of overwriting a divergent copy.
 
-Read [coding-agent integration](references/coding-agent-integration.md) for the portable prompt and backend decision. Product-specific rule files are intentionally not copies of the full methodology; keeping one canonical contract prevents drift.
+`SKILL.md` is the canonical workflow, `AGENTS.md` is a compact repository instruction, and every analysis/data-acquisition utility is an ordinary Python CLI. Other coding agents (Cursor, Cline, OpenCode, other MCP clients, IDE agents, CI workers, or a plain shell) can use the same files; read [coding-agent integration](references/coding-agent-integration.md) for the portable prompt and backend decision. Product-specific rule files are intentionally not copies of the full methodology; keeping one canonical contract prevents drift.
 
-### Install as a Codex skill
+### Codex
 
 Clone the repository into the Codex skills directory:
 
@@ -65,16 +69,59 @@ Invoke it in Codex with:
 $analyze-cycling-hr-thresholds
 ```
 
-Example prompt:
+### Claude Code
 
-```text
-Use $analyze-cycling-hr-thresholds to analyze my complete Garmin cycling
-history and raw CPET workbook independently, reconcile LTHR, VT1, and RCP,
-estimate an FTP proxy if the available power evidence supports one, and give
-me Garmin-ready HR zones with confidence ranges and caveats.
+```bash
+mkdir -p "$HOME/.claude/skills"
+git clone https://github.com/victory-c/analyze-cycling-hr-thresholds.git \
+  "$HOME/.claude/skills/analyze-cycling-hr-thresholds"
+cd "$HOME/.claude/skills/analyze-cycling-hr-thresholds"
+python -m pip install -r scripts/requirements.txt
 ```
 
+Invoke `/analyze-cycling-hr-thresholds` in Claude Code. For Claude web/desktop
+custom skills, upload a ZIP containing the skill folder through the skills UI
+when available. That does not give a hosted client access to your local files;
+provide the relevant exports in that client.
+
+### Example prompt
+
+```text
+Use the analyze-cycling-hr-thresholds skill to analyze my last 90 days of
+cycling from the available Garmin or official Strava connection and any
+CPET files I provide. Analyze sources independently, reconcile LTHR, VT1,
+and RCP, and estimate an FTP proxy only if power evidence supports one.
+Give me HR zones with confidence ranges and caveats; do not change my settings.
+```
+
+### Other coding agents
+
 For another coding agent, clone the repository anywhere accessible and instruct the agent to read `AGENTS.md` and `SKILL.md`. It can then use MCP or the direct CLI described below.
+
+### Connect data sources separately
+
+Use a Garmin backend (below), the official Strava MCP at
+`https://mcp.strava.com/mcp`, or local exports. Neither both providers nor a CPET
+test is required. The skill discovers actual capabilities; summaries alone do
+not support full-resolution threshold analysis.
+
+The skill is client-portable, but MCP authentication compatibility is separate.
+On September 6, 2026, Claude Code authentication and tool discovery succeeded;
+Codex CLI 0.147.0 rejected inconsistent Strava OAuth issuer metadata before
+consent. This is not a claim that Strava permanently supports only Claude.
+Activity access and eligibility still require a successful read. The skill does
+not bypass issuer validation or reuse another client's tokens.
+
+See [client setup, capability routing, and connection diagnostics](references/client-and-source-routing.md)
+for the observed schemas, native setup commands, and official documentation.
+This optional diagnostic reads public metadata only (no login or private data):
+
+```bash
+python scripts/check_strava_oauth.py
+```
+
+Exit status `0` means metadata is consistent, **not** that you are logged in;
+status `1` reports a mismatch, changed discovery, or fetch/parse failure.
 
 ## Choose a Garmin backend
 
@@ -152,7 +199,7 @@ python scripts/calculate_hr_zones.py \
 ```bash
 python scripts/analyze_field_hr.py \
   --fit-json activity_a.json activity_b.json \
-  --windows-min 20 30 40 60
+  --windows-min 20 30 40 60 --max-interpolation-gap-seconds 5
 ```
 
 The output ranks sustained HR windows as candidate evidence. It does not automatically diagnose LTHR.
@@ -235,7 +282,8 @@ Read [the FTP proxy methodology](references/ftp-without-power-meter.md) before i
 
 ## Methodology and evidence
 
-- [Garmin field-data workflow](references/garmin-data-workflow.md)
+- [Claude/Codex and Garmin/Strava/local source routing](references/client-and-source-routing.md)
+- [Field-data workflow](references/garmin-data-workflow.md)
 - [Garmin data-source feasibility and backends](references/garmin-data-sources.md)
 - [Coding-agent integration](references/coding-agent-integration.md)
 - [CPET threshold methods](references/cpet-threshold-methods.md)
