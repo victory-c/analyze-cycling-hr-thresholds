@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize sustained HR evidence from Garmin/FIT JSON exports.
+"""Summarize sustained HR evidence from Garmin/FIT JSON exports or Strava MCP streams.
 
 This utility finds auditable candidate efforts. It does not declare LTHR or VT1.
 """
@@ -86,15 +86,54 @@ def find_record_lists(value: Any) -> list[list[dict[str, Any]]]:
     return found
 
 
+def first_list(node: dict[str, Any], keys: tuple[str, ...]) -> list[Any] | None:
+    return next((node[key] for key in keys if isinstance(node.get(key), list)), None)
+
+
+def find_parallel_streams(value: Any) -> list[tuple[list[Any], list[Any]]]:
+    """Find column-oriented streams such as Strava MCP {"time": [...], "heart_rate": [...]}."""
+    found: list[tuple[list[Any], list[Any]]] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            times = first_list(node, TIME_KEYS)
+            hrs = first_list(node, HR_KEYS)
+            # Unequal lengths mean the sample alignment is unknown, so never zip them.
+            if times is not None and hrs is not None and len(times) == len(hrs) >= 2:
+                found.append((times, hrs))
+                return
+            for child in node.values():
+                walk(child)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(unwrap(value))
+    return found
+
+
+def raw_samples(payload: Any) -> list[tuple[Any, Any]]:
+    record_lists = find_record_lists(payload)
+    if record_lists:
+        return [
+            (
+                next((record.get(key) for key in TIME_KEYS if key in record), None),
+                next((record.get(key) for key in HR_KEYS if key in record), None),
+            )
+            for record in max(record_lists, key=len)
+        ]
+    streams = find_parallel_streams(payload)
+    if streams:
+        times, hrs = max(streams, key=lambda pair: len(pair[0]))
+        return list(zip(times, hrs))
+    return []
+
+
 def extract_points(payload: Any) -> list[tuple[float, float]]:
-    candidates = find_record_lists(payload)
-    if not candidates:
-        return []
-    records = max(candidates, key=len)
     points = []
-    for record in records:
-        timestamp = next((parse_time(record.get(key)) for key in TIME_KEYS if key in record), None)
-        hr = next((numeric(record.get(key)) for key in HR_KEYS if key in record), None)
+    for raw_time, raw_hr in raw_samples(payload):
+        timestamp = parse_time(raw_time)
+        hr = numeric(raw_hr)
         if timestamp is not None and hr is not None and 25 <= hr <= 260:
             points.append((timestamp, hr))
     points.sort()
@@ -159,7 +198,7 @@ def summarize_file(path: Path, windows: list[int], max_gap: int) -> dict[str, An
     payload = json.loads(path.read_text(encoding="utf-8"))
     points = extract_points(payload)
     if not points:
-        return {"file": path.name, "error": "no timestamped HR record list found"}
+        return {"file": path.name, "error": "no timestamped HR records or aligned time/HR streams found"}
     gaps = [b[0] - a[0] for a, b in zip(points, points[1:]) if b[0] > a[0]]
     runs = interpolate_seconds(points, max_gap=max_gap)
     values = [hr for _, hr in points]
@@ -194,7 +233,7 @@ def inventory_activity_list(path: Path) -> dict[str, Any]:
     with_hr = 0
     with_power = 0
     for item in activities:
-        sport = str(item.get("activityType") or item.get("sport") or item.get("type") or "unknown")
+        sport = str(item.get("activityType") or item.get("sport") or item.get("sport_type") or item.get("type") or "unknown")
         sports[sport] = sports.get(sport, 0) + 1
         if any(numeric(item.get(key)) is not None for key in ("averageHR", "averageHeartRate", "maxHR", "maxHeartRate")):
             with_hr += 1
@@ -212,8 +251,14 @@ def inventory_activity_list(path: Path) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--fit-json", nargs="+", type=Path, required=True, help="JSON exports containing FIT records")
-    parser.add_argument("--activity-list-json", type=Path, help="optional Garmin activity-list export")
+    parser.add_argument(
+        "--fit-json",
+        nargs="+",
+        type=Path,
+        required=True,
+        help="JSON exports containing timestamped HR records or Strava MCP time/heart_rate streams",
+    )
+    parser.add_argument("--activity-list-json", type=Path, help="optional Garmin or Strava activity-list export")
     parser.add_argument("--windows-min", nargs="+", type=int, default=[20, 30, 40, 60])
     parser.add_argument("--max-interpolation-gap-seconds", type=int, default=12)
     parser.add_argument("--output-json", type=Path)

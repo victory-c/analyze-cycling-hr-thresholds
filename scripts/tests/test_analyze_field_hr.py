@@ -1,9 +1,11 @@
+import json
+import tempfile
 import unittest
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from analyze_field_hr import best_window, extract_points, interpolate_seconds, unwrap
+from analyze_field_hr import best_window, extract_points, interpolate_seconds, inventory_activity_list, unwrap
 
 
 class FieldAnalysisTests(unittest.TestCase):
@@ -19,6 +21,26 @@ class FieldAnalysisTests(unittest.TestCase):
             ]
         }
         self.assertEqual(extract_points(payload), [(0.0, 101.0), (2.0, 103.0)])
+
+    def test_extracts_strava_mcp_parallel_streams(self):
+        payload = {"heart_rate": [144, 168, 189], "time": [10, 11, 13], "moving": [False, True, True]}
+        self.assertEqual(extract_points(payload), [(0.0, 144.0), (1.0, 168.0), (3.0, 189.0)])
+
+    def test_extracts_streams_from_mcp_text_content(self):
+        streams = {"time": [0, 1], "heart_rate": [120, 121]}
+        wrapped = {"content": [{"type": "text", "text": json.dumps(streams)}]}
+        self.assertEqual(extract_points(wrapped), [(0.0, 120.0), (1.0, 121.0)])
+
+    def test_rejects_misaligned_streams(self):
+        self.assertEqual(extract_points({"time": [0, 1, 2], "heart_rate": [120, 121]}), [])
+
+    def test_inventories_strava_activity_list(self):
+        activities = {"activities": [{"id": "1", "sport_type": "Ride"}, {"id": "2", "sport_type": "WeightTraining"}]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "activities.json"
+            path.write_text(json.dumps(activities), encoding="utf-8")
+            result = inventory_activity_list(path)
+        self.assertEqual(result["sports"], {"Ride": 1, "WeightTraining": 1})
 
     def test_interpolation_does_not_bridge_long_gap(self):
         runs = interpolate_seconds([(0.0, 100.0), (2.0, 102.0), (20.0, 140.0)], max_gap=5)

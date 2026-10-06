@@ -157,6 +157,8 @@ python scripts/analyze_field_hr.py \
 
 The output ranks sustained HR windows as candidate evidence. It does not automatically diagnose LTHR.
 
+It also reads the column-oriented streams returned by the official Strava MCP's `get_activity_streams` tool, for example `{"time": [...], "heart_rate": [...]}`. Request `time` and `heart_rate` without `resolution`: downsampled streams leave gaps that the analyzer deliberately will not bridge. `--activity-list-json` also accepts Strava's `list_activities` output.
+
 ### Analyze raw CPET workbooks
 
 ```bash
