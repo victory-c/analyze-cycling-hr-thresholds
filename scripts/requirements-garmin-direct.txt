@@ -1,0 +1,4 @@
+# Optional direct-backend dependencies. The analysis-only tools remain usable on Python 3.10+.
+# garminconnect 0.3.8 requires Python 3.12+.
+garminconnect==0.3.8
+fitparse>=1.2,<2

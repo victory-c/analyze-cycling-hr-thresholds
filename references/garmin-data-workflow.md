@@ -4,6 +4,8 @@
 
 Estimate cycling LTHR/LT2 evidence from sustained field HR, independently of the laboratory result. Garmin data usually cannot locate VT1 confidently unless workload was controlled and power, lactate, gas exchange, or a validated surrogate was recorded.
 
+First choose an acquisition backend using [garmin-data-sources.md](garmin-data-sources.md). MCP and direct API acquisition are interchangeable transports for this one Garmin source; never treat their agreement as independent validation.
+
 ## 1. Build a complete inventory
 
 Paginate through the entire activity history. Retain cycling subtypes and identify indoor/outdoor duplicates, multisport legs, recordings with zero duration, and activities with no HR.

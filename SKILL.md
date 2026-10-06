@@ -1,6 +1,6 @@
 ---
 name: analyze-cycling-hr-thresholds
-description: Independently estimate cycling LTHR/LT2, VT1/GET, VT2/RCP, and—when no on-bike power meter exists—defensible FTP or threshold-power proxies from Garmin cycling history and/or raw CPET breath-by-breath files; audit sensor and protocol quality; reconcile field and laboratory evidence without blind averaging; and produce physiologically defensible HR zones plus Garmin-ready settings. Use for cycling threshold analysis, CPET interpretation, indirect FTP estimation, Garmin zone setup, or disagreements between lab and field thresholds.
+description: Independently estimate cycling LTHR/LT2, VT1/GET, VT2/RCP, and—when no on-bike power meter exists—defensible FTP or threshold-power proxies from Garmin cycling history acquired through garmin_mcp, a direct read-only API CLI, or offline exports, and/or raw CPET breath-by-breath files; audit sensor and protocol quality; reconcile field and laboratory evidence without blind averaging; and produce physiologically defensible HR zones plus Garmin-ready settings. Use for cycling threshold analysis, Garmin data acquisition, CPET interpretation, indirect FTP estimation, Garmin zone setup, or disagreements between lab and field thresholds.
 ---
 
 # Analyze Cycling Heart-Rate Thresholds
@@ -17,11 +17,13 @@ Estimate thresholds from each source independently, preserve uncertainty, and on
 - Never convert heart rate directly to watts. With no defensible power input, report FTP as not identifiable.
 - Report uncertainty and data limitations. Do not diagnose a medical condition from these files.
 - Keep private health data, activity IDs, coordinates, names, and raw exports out of any published repository.
+- Treat `garmin_mcp` and direct Garmin Connect calls as alternate transports for one source, never as two independent datasets.
+- Keep all Garmin access read-only. Never request credentials in chat or store passwords in agent configuration.
 
 ## Workflow
 
 1. Define the question and available sources. Distinguish LTHR/LT2, VT1/GET, VT2/RCP, HRmax, and operational zones.
-2. Audit Garmin data by following [garmin-data-workflow.md](references/garmin-data-workflow.md).
+2. Ask the user to choose a Garmin acquisition backend by following [garmin-data-sources.md](references/garmin-data-sources.md), then audit the data with [garmin-data-workflow.md](references/garmin-data-workflow.md).
 3. Audit and analyze raw CPET data by following [cpet-threshold-methods.md](references/cpet-threshold-methods.md).
 4. Complete the two estimates independently before viewing or using the other source's numerical conclusion.
 5. Reconcile constructs and confidence using [reconciliation-and-zones.md](references/reconciliation-and-zones.md).
@@ -31,6 +33,7 @@ Estimate thresholds from each source independently, preserve uncertainty, and on
 
 ## Garmin analysis
 
+- If an MCP-capable coding agent is available and the user chooses it, use the read-only `Taxuspt/garmin_mcp` allowlist. Otherwise use the agent-neutral `scripts/fetch_garmin.py` CLI. Do not require Codex specifically; follow [coding-agent-integration.md](references/coding-agent-integration.md).
 - Enumerate the complete cycling history with pagination. Record activity type, date, duration, HR coverage, sensor type when available, temperature, laps, power availability, and duplication.
 - Inspect raw FIT/HR records for the strongest sustained efforts instead of selecting by headline max HR.
 - Use repeated continuous best-window means, especially 20, 30, 40, and 60 minutes. Seek clustering across separate rides and conditions.
@@ -90,6 +93,21 @@ Summarize exported field HR evidence:
 
 ```bash
 python scripts/analyze_field_hr.py --fit-json activity_a.json activity_b.json --windows-min 20 30 40 60
+```
+
+Generate a minimal `garmin_mcp` configuration for an MCP client:
+
+```bash
+python scripts/render_garmin_mcp_config.py --client generic
+```
+
+Or acquire the same Garmin source through the direct read-only CLI (Python 3.12+):
+
+```bash
+python3.12 -m pip install -r scripts/requirements-garmin-direct.txt
+python3.12 scripts/fetch_garmin.py auth
+python3.12 scripts/fetch_garmin.py activities --start-date 2020-01-01 --end-date 2026-09-01 --output activities.json
+python3.12 scripts/fetch_garmin.py bundle --activity-id 123456789 --output activity.json
 ```
 
 Generate a first-pass CPET QC and breakpoint report:
