@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 
-A reusable skill for **Claude and Codex**, using available Garmin data, the **official Strava MCP**, or local activity and cycling CPET files to produce defensible heart-rate thresholds, training zones, and—when no on-bike power meter exists—carefully labeled FTP proxies.
+A reusable skill and CLI toolkit for **Claude, Codex, and other coding agents**, using Garmin data (MCP, a direct read-only CLI, or exports), the **official Strava MCP**, or local activity and cycling CPET files to produce defensible heart-rate thresholds, training zones, and—when no on-bike power meter exists—carefully labeled FTP proxies.
 
 The central principle is simple: analyze every source independently, audit its validity, and reconcile physiological constructs rather than averaging numbers that merely have similar labels.
 
@@ -21,6 +21,9 @@ The central principle is simple: analyze every source independently, audit its v
   - multi-duration critical-power fitting.
 - Reports confidence, plausible ranges, disagreements, and the single most useful follow-up test.
 - Discovers the current client's tools without hard-coded provider prefixes; supports field-only or lab-only analysis and avoids counting synchronized Garmin/Strava copies as independent efforts.
+- Acquires Garmin evidence through either:
+  - [`Taxuspt/garmin_mcp`](https://github.com/Taxuspt/garmin_mcp) for MCP-capable agents; or
+  - an explicit read-only Garmin Connect API CLI for any agent that can execute Python and read JSON.
 
 ## Guardrails
 
@@ -36,10 +39,12 @@ This project deliberately refuses several tempting shortcuts:
 
 ## Install
 
-The same skill folder works in both clients. Choose the installation below for
+The same skill folder works in Claude and Codex. Choose the installation below for
 your client; installing the skill does **not** connect an account or grant access
 to health data. If the target folder already exists, review its changes before
 updating it instead of overwriting a divergent copy.
+
+`SKILL.md` is the canonical workflow, `AGENTS.md` is a compact repository instruction, and every analysis/data-acquisition utility is an ordinary Python CLI. Other coding agents (Cursor, Cline, OpenCode, other MCP clients, IDE agents, CI workers, or a plain shell) can use the same files; read [coding-agent integration](references/coding-agent-integration.md) for the portable prompt and backend decision. Product-specific rule files are intentionally not copies of the full methodology; keeping one canonical contract prevents drift.
 
 ### Codex
 
@@ -89,9 +94,13 @@ and RCP, and estimate an FTP proxy only if power evidence supports one.
 Give me HR zones with confidence ranges and caveats; do not change my settings.
 ```
 
+### Other coding agents
+
+For another coding agent, clone the repository anywhere accessible and instruct the agent to read `AGENTS.md` and `SKILL.md`. It can then use MCP or the direct CLI described below.
+
 ### Connect data sources separately
 
-Use your existing Garmin MCP, the official Strava MCP at
+Use a Garmin backend (below), the official Strava MCP at
 `https://mcp.strava.com/mcp`, or local exports. Neither both providers nor a CPET
 test is required. The skill discovers actual capabilities; summaries alone do
 not support full-resolution threshold analysis.
@@ -113,6 +122,68 @@ python scripts/check_strava_oauth.py
 
 Exit status `0` means metadata is consistent, **not** that you are logged in;
 status `1` reports a mismatch, changed discovery, or fetch/parse failure.
+
+## Choose a Garmin backend
+
+These are alternate transports for the **same Garmin source**. Using both does not create two independent physiological datasets; the CPET or another separately collected test remains the independent source.
+
+| Choice | Use when | Agent interface | Garmin API status |
+|---|---|---|---|
+| `garmin_mcp` | The agent supports local MCP servers | MCP tools | Unofficial Garmin Connect API via `python-garminconnect` |
+| Direct CLI | The agent can run Python and read files | Versioned JSON/FIT | Unofficial, explicit read-only Garmin Connect endpoints |
+| Official Activity API | You have an approved business integration | Your own OAuth 2.0 adapter | Official Garmin Developer Program |
+
+Garmin's official [Activity API](https://developer.garmin.com/gc-developer-program/activity-api/) is a strong production route, but the [Developer Program FAQ](https://developer.garmin.com/gc-developer-program/program-faq/) currently describes it as an application/approval-based business program, not a self-service personal-account API. See [Garmin data-source backends](references/garmin-data-sources.md) for the feasibility analysis, security model, endpoint coverage, and caveats.
+
+### Option A: `garmin_mcp`
+
+Authenticate locally once, without putting a password in the agent configuration:
+
+```bash
+uvx --python 3.12 --from git+https://github.com/Taxuspt/garmin_mcp garmin-mcp-auth
+```
+
+Render a minimal read-only MCP configuration:
+
+```bash
+python scripts/render_garmin_mcp_config.py --client generic
+python scripts/render_garmin_mcp_config.py --client mcp-json
+python scripts/render_garmin_mcp_config.py --client codex
+python scripts/render_garmin_mcp_config.py --client opencode
+```
+
+The renderer only prints configuration and never edits global settings. The allowlist excludes Garmin write tools.
+
+### Option B: direct read-only API CLI
+
+The direct backend uses `python-garminconnect` for hardened authentication/token refresh and makes the analysis endpoint calls explicitly. Its optional dependency currently requires Python 3.12+.
+
+```bash
+python3.12 -m pip install -r scripts/requirements-garmin-direct.txt
+python3.12 scripts/fetch_garmin.py auth
+```
+
+Fetch a complete paginated cycling inventory and a full candidate bundle:
+
+```bash
+python3.12 scripts/fetch_garmin.py activities \
+  --start-date 2020-01-01 --end-date 2026-09-01 \
+  --activity-type cycling \
+  --output private/garmin/activities.json
+
+python3.12 scripts/fetch_garmin.py bundle \
+  --activity-id 123456789 \
+  --output private/garmin/activity-123456789.json
+```
+
+The bundle preserves summary, lap/split, historical HR-zone, and full FIT record/session/lap data. `derived` retrieves configured zones, cycling FTP, raw lactate-threshold payload, max metrics, training status, and profile settings as metadata:
+
+```bash
+python3.12 scripts/fetch_garmin.py derived --date 2026-09-01 \
+  --output private/garmin/derived.json
+```
+
+The CLI has no email/password flags, makes no write calls, and wraps JSON in a versioned provenance envelope. CI uses fake transports only and never authenticates to Garmin.
 
 ## Command-line tools
 
@@ -196,6 +267,7 @@ Read [the FTP proxy methodology](references/ftp-without-power-meter.md) before i
 ```text
 .
 ├── SKILL.md                         # Agent-facing workflow
+├── AGENTS.md                        # Portable coding-agent entrypoint
 ├── agents/openai.yaml              # Skill UI metadata
 ├── references/                     # Methodological guidance
 ├── scripts/                        # Auditable analysis utilities
@@ -210,6 +282,8 @@ Read [the FTP proxy methodology](references/ftp-without-power-meter.md) before i
 
 - [Claude/Codex and Garmin/Strava/local source routing](references/client-and-source-routing.md)
 - [Field-data workflow](references/garmin-data-workflow.md)
+- [Garmin data-source feasibility and backends](references/garmin-data-sources.md)
+- [Coding-agent integration](references/coding-agent-integration.md)
 - [CPET threshold methods](references/cpet-threshold-methods.md)
 - [FTP estimation without an on-bike power meter](references/ftp-without-power-meter.md)
 - [Reconciliation and zone construction](references/reconciliation-and-zones.md)
@@ -223,6 +297,8 @@ Primary research links are included next to the claims they support in the refer
 python -m pip install -r scripts/requirements.txt
 python -m unittest discover -s scripts/tests -v
 ```
+
+The direct Garmin backend is optional and has its own pinned requirements file so the core analyzers remain usable without Garmin dependencies.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Never commit real athlete exports or identifiable health data, including in tests and issue attachments.
 
