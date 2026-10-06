@@ -54,7 +54,7 @@ connector only; do not assume it exposes raw streams or Garmin write tools.
 - Treat configured HR-zone boundaries, FTP, max HR, and Garmin threshold values as metadata to verify, not observations.
 - If power is absent, state that workload stability and cardiac drift cannot be fully separated.
 - Do not infer watts from HR or speed alone. Use a controlled climb model only when mass, route geometry, time, wind/aerodynamic assumptions, surface, and pacing are defensible.
-- Use `scripts/analyze_field_hr.py` when Garmin/FIT data have been exported as JSON. Its results identify candidate efforts; an analyst must still judge terrain, pauses, heat, drift, and repeatability.
+- Use `scripts/analyze_field_hr.py --activity` on original FIT files or saved JSON records/streams; see [activity inputs](references/garmin-data-workflow.md#activity-inputs-for-the-field-helper). Its results identify candidate efforts; an analyst must still judge terrain, pauses, heat, drift, and repeatability.
 - Activity summaries can select candidates but cannot reconstruct sustained-window HR, paired-power decoupling, or historical time in custom zones. Request suitable source files or mark those conclusions not identifiable when raw data are unavailable.
 
 ## Laboratory analysis

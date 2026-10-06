@@ -30,6 +30,8 @@ power. A device model does not prove the HR sensor was a chest strap.
 versions differ; tools such as `get_activity_streams` or `analyze_decoupling`
 are examples to look for, not guaranteed dependencies. Follow all pages,
 preserve raw timestamps and timer events, and inspect returned QC/warnings.
+The repository's supported Garmin backends (the read-only `garmin_mcp` allowlist
+and the direct CLI) are described in [garmin-data-sources.md](garmin-data-sources.md).
 
 **Official Strava MCP:** Connect directly to `https://mcp.strava.com/mcp` in the
 client. Discover its actual tools after OAuth and any eligibility check. It is
@@ -51,17 +53,34 @@ and missing streams omitted. Reinspect the live schema before use; check which
 streams actually returned and their alignment, coverage, and units. Tool
 discovery alone did not validate activity access or the returned stream shape.
 
-**Local files:** The field helper accepts JSON containing a list of records with
-explicit timestamps and HR, for example:
+A live read on October 4, 2026 returned parallel arrays such as
+`{"time": [...], "heart_rate": [...], "moving": [...]}`; a ride recorded without
+a power meter returned no `watts`. Save the full-resolution result to private
+storage and pass it to the field helper; omit `resolution`, because downsampled
+streams leave gaps the helper deliberately will not bridge.
+
+**intervals.icu:** No official MCP server was found. Community MCP servers and the
+REST API both use the athlete's own API key (Basic auth with username `API_KEY`),
+which the account holder configures; never request it in chat. Fetch
+`/api/v1/activity/{id}/streams.json?types=time,heartrate,watts` or the original
+file from `/api/v1/activity/{id}/file`. Activities that intervals.icu imported
+from Strava are returned as empty stubs, so they cannot replace the Strava MCP or
+original device files.
+
+**Local files:** The field helper (`scripts/analyze_field_hr.py --activity`) reads
+original FIT files (raw, Strava bulk-export `.fit.gz`, or Garmin `.zip`), JSON
+record lists with explicit timestamps and HR, and JSON stream arrays from the
+Strava MCP, intervals.icu, or the Strava REST API. A minimal record list:
 
 ```json
 {"records": [{"timestamp": 0, "heart_rate": 110}, {"timestamp": 1, "heart_rate": 111}]}
 ```
 
-`timestamp` is ISO-8601 or numeric seconds; HR is bpm. The helper does not directly
-decode binary FIT, GPX, TCX, or arbitrary parallel-array stream formats. Normalize
-with an appropriate decoder first, retaining units, missingness, provenance and
-pause boundaries. Export separately per continuous effort if timer events would
+`timestamp` is ISO-8601 or numeric seconds; HR is bpm. See
+[activity inputs](garmin-data-workflow.md#activity-inputs-for-the-field-helper)
+for each source. The helper does not read GPX or TCX; convert those with an
+appropriate decoder first, retaining units, missingness, provenance and pause
+boundaries. Export separately per continuous effort if timer events would
 otherwise be lost. It can unwrap common JSON MCP envelopes, but validate the
 actual extracted sample count; conversational summaries are not raw records.
 Keep account data and intermediate exports in private working storage. CPET XLSX
