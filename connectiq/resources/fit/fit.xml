@@ -6,4 +6,9 @@
     <fitField id="4" displayInActivitySummary="true" sortOrder="4" precision="0" dataLabel="@Strings.PctLowLabel" unitLabel="@Strings.PctUnit" />
     <fitField id="5" displayInActivitySummary="true" sortOrder="5" precision="0" dataLabel="@Strings.PctMidLabel" unitLabel="@Strings.PctUnit" />
     <fitField id="6" displayInActivitySummary="true" sortOrder="6" precision="0" dataLabel="@Strings.PctHighLabel" unitLabel="@Strings.PctUnit" />
+    <fitField id="7" displayInActivitySummary="true" sortOrder="7" precision="0" dataLabel="@Strings.ClimbPowerLabel" unitLabel="@Strings.WattUnit" />
+    <fitField id="8" displayInActivitySummary="true" sortOrder="8" precision="0" dataLabel="@Strings.ClimbPowerLowLabel" unitLabel="@Strings.WattUnit" />
+    <fitField id="9" displayInActivitySummary="true" sortOrder="9" precision="0" dataLabel="@Strings.ClimbPowerHighLabel" unitLabel="@Strings.WattUnit" />
+    <fitField id="10" displayInActivitySummary="true" sortOrder="10" precision="0" dataLabel="@Strings.ClimbDurationLabel" unitLabel="@Strings.MinUnit" />
+    <fitField id="11" displayInActivitySummary="true" sortOrder="11" precision="1" dataLabel="@Strings.ClimbGradeLabel" unitLabel="@Strings.PctUnit" />
 </fitContributions>

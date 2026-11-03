@@ -22,4 +22,20 @@
     <string id="PctHighLabel">Time at/above LTHR</string>
     <string id="BpmUnit">bpm</string>
     <string id="PctUnit">%</string>
+    <string id="Climb">Climb</string>
+    <string id="BestClimb">Best</string>
+    <string id="RiderKgTitle">Rider mass (kg)</string>
+    <string id="RiderKgPrompt">0 = use the weight in your Garmin profile. Needed for climb power.</string>
+    <string id="BikeKgTitle">Bike + kit mass (kg)</string>
+    <string id="CdaTitle">CdA (m2), climbing position</string>
+    <string id="CrrTitle">Rolling resistance Crr</string>
+    <string id="EfficiencyTitle">Drivetrain efficiency (0-1)</string>
+    <string id="TempCTitle">Air temperature (C) for air density</string>
+    <string id="ClimbPowerLabel">Best climb virtual power</string>
+    <string id="ClimbPowerLowLabel">Best climb power (low)</string>
+    <string id="ClimbPowerHighLabel">Best climb power (high)</string>
+    <string id="ClimbDurationLabel">Best climb duration</string>
+    <string id="ClimbGradeLabel">Best climb grade</string>
+    <string id="WattUnit">W</string>
+    <string id="MinUnit">min</string>
 </strings>

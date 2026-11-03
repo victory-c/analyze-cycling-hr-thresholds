@@ -141,3 +141,174 @@ function testFullHourBufferFitsMemory(logger as Test.Logger) as Boolean {
     Test.assert(used < 16384);
     return true;
 }
+
+// --- Climb virtual power: mirrors scripts/tests/test_estimate_ftp_without_power_meter.py
+
+function near(actual as Float?, expected as Float, tolerance as Float) as Boolean {
+    return actual != null && (actual - expected).abs() <= tolerance;
+}
+
+(:test)
+function testClimbPowerMatchesPython(logger as Test.Logger) as Boolean {
+    // Python: climb_power(82, 10000, 700, 3000, 0.32, 0.005, 1.18, 0, 0.975) -> 213.3 W
+    var p = new ClimbModel.Params(82.0, 0.32, 0.005, 0.975, 0.0, 1.18);
+    var power = ClimbModel.climbPower(p, 10000.0, 700.0, 3000.0);
+    logger.debug("climb power: " + power);
+    Test.assert(near(power, 213.3, 0.15));
+    return true;
+}
+
+(:test)
+function testClimbScenariosMatchPython(logger as Test.Logger) as Boolean {
+    // Python low/high: (81, 679 m, CdA .28, Crr .004, eff .99, -2 m/s) -> 193.3;
+    // (83, 721 m, CdA .36, Crr .006, eff .96, +2 m/s) -> 241.7
+    var p = new ClimbModel.Params(82.0, 0.32, 0.005, 0.975, 0.0, 1.18);
+    var s = ClimbModel.scenarios(p, 10000.0, 700.0, 3000.0);
+    Test.assert(near(s[0], 193.3, 0.15));
+    Test.assert(near(s[1], 213.3, 0.15));
+    Test.assert(near(s[2], 241.7, 0.15));
+    return true;
+}
+
+(:test)
+function testClimbPowerRejectsInvalidGeometry(logger as Test.Logger) as Boolean {
+    var p = new ClimbModel.Params(82.0, 0.32, 0.005, 0.975, 0.0, 1.18);
+    Test.assert(ClimbModel.climbPower(p, 100.0, 100.0, 60.0) == null);
+    Test.assert(ClimbModel.climbPower(p, 100.0, -1.0, 60.0) == null);
+    Test.assert(ClimbModel.climbPower(p, 100.0, 5.0, 0.0) == null);
+    return true;
+}
+
+(:test)
+function testAirDensity(logger as Test.Logger) as Boolean {
+    Test.assert(near(ClimbModel.airDensity(101325.0, 20.0), 1.2041, 0.001));
+    Test.assert(near(ClimbModel.isaPressure(0.0), 101325.0, 1.0));
+    return true;
+}
+
+//! 120 s flat at 8 m/s, a 900 s 6 % climb at 4 m/s, then flatSeconds of flat.
+function rideClimb(detector as ClimbModel.Detector, climbSeconds as Number, flatSeconds as Number, power as Number?) as Void {
+    var d = 0.0;
+    var a = 100.0;
+    var t = 0;
+    for (var i = 0; i < 120; i++) {
+        detector.addSample(t, d, a, power);
+        t++;
+        d += 8.0;
+    }
+    for (var i = 0; i < climbSeconds; i++) {
+        detector.addSample(t, d, a, power);
+        t++;
+        d += 4.0;
+        a += 0.24;
+    }
+    for (var i = 0; i < flatSeconds; i++) {
+        detector.addSample(t, d, a, power);
+        t++;
+        d += 8.0;
+    }
+}
+
+function climbParams() as ClimbModel.Params {
+    return new ClimbModel.Params(84.0, 0.32, 0.005, 0.975, 0.0, 1.2);
+}
+
+(:test)
+function testDetectorTrimsClimbToItsEnds(logger as Test.Logger) as Boolean {
+    var detector = new ClimbModel.Detector(12);
+    detector.params = climbParams();
+    rideClimb(detector, 900, 180, null);
+    var best = detector.best;
+    Test.assert(best != null);
+    var climb = best as ClimbModel.Climb;
+    logger.debug("climb: " + climb.durationS + " s, " + climb.distanceM + " m, " + climb.gainM + " m, " + climb.powerW);
+    // Python: climb_power(84, 3600, 216, 900, 0.32, 0.005, 1.2, 0, 0.975) -> 232.2 W
+    Test.assertEqual(climb.durationS, 900);
+    Test.assert(near(climb.distanceM, 3600.0, 0.5));
+    Test.assert(near(climb.gainM, 216.0, 0.1));
+    Test.assert(near(climb.powerW[1], 232.2, 0.3));
+    Test.assert(near(climb.powerW[0], 207.2, 0.3));
+    Test.assert(near(climb.powerW[2], 267.8, 0.3));
+    Test.assert(near(climb.gradePct(), 6.01, 0.02));
+    Test.assert(climb.measuredW == null);
+    Test.assert(!climb.inFtpWindow());
+    return true;
+}
+
+(:test)
+function testShortClimbIsNotKept(logger as Test.Logger) as Boolean {
+    var detector = new ClimbModel.Detector(12);
+    detector.params = climbParams();
+    rideClimb(detector, 300, 180, null);
+    Test.assert(detector.best == null);
+    return true;
+}
+
+(:test)
+function testLongGapEndsClimb(logger as Test.Logger) as Boolean {
+    var detector = new ClimbModel.Detector(12);
+    detector.params = climbParams();
+    var d = 0.0;
+    var a = 100.0;
+    for (var t = 0; t < 400; t++) {
+        detector.addSample(t, d, a, null);
+        d += 4.0;
+        a += 0.24;
+    }
+    Test.assert(detector.current() != null);
+    // A 60 s gap (e.g. a stop with auto-pause off and no samples) closes it.
+    detector.addSample(460, d, a, null);
+    Test.assert(detector.current() == null);
+    return true;
+}
+
+(:test)
+function testNoMassMeansNoClimbPower(logger as Test.Logger) as Boolean {
+    var detector = new ClimbModel.Detector(12);
+    rideClimb(detector, 900, 180, null);
+    Test.assert(detector.best == null);
+    return true;
+}
+
+(:test)
+function testMeterPowerReportedWhenItCoversTheClimb(logger as Test.Logger) as Boolean {
+    var detector = new ClimbModel.Detector(12);
+    detector.params = climbParams();
+    rideClimb(detector, 900, 180, 240);
+    var climb = detector.best as ClimbModel.Climb;
+    Test.assert(near(climb.measuredW, 240.0, 0.01));
+    return true;
+}
+
+(:test)
+function testFtpWindowFlag(logger as Test.Logger) as Boolean {
+    var detector = new ClimbModel.Detector(12);
+    detector.params = climbParams();
+    rideClimb(detector, 2700, 180, null);
+    Test.assert((detector.best as ClimbModel.Climb).inFtpWindow());
+    return true;
+}
+
+(:test)
+function testWorstCaseClimbRowFitsScreen(logger as Test.Logger) as Boolean {
+    var w = System.getDeviceSettings().screenWidth;
+    var options = {:width => w, :height => 40};
+    var bitmap = (Graphics has :createBufferedBitmap)
+        ? Graphics.createBufferedBitmap(options).get() as Graphics.BufferedBitmap
+        : new Graphics.BufferedBitmap(options);
+    var dc = bitmap.getDc();
+    // Widest realistic rows on the full-page layout, in both languages, after
+    // fitRow() has dropped the range and/or shrunk the font.
+    var labels = ["Climb 68' 12.5%*", "Best 68' 12.5%*", "爬坡 68' 12.5%*", "60'"];
+    var full = "1088 W 1012-1199";
+    for (var i = 0; i < labels.size(); i++) {
+        var value = i == 3 ? "203 (+15)" : full;
+        var short = i == 3 ? value : "1088 W";
+        var fit = fitRow(dc, w, labels[i], value, short);
+        var font = fit[0] as Graphics.FontType;
+        var total = dc.getTextWidthInPixels(labels[i], font) + dc.getTextWidthInPixels(fit[1] as String, font) + 3 * ROW_PAD;
+        logger.debug(labels[i] + " -> '" + fit[1] + "' width " + total + " / " + w);
+        Test.assert(total <= w);
+    }
+    return true;
+}

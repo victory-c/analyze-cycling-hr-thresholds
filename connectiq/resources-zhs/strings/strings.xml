@@ -22,4 +22,20 @@
     <string id="DomainHigh">&gt;LT</string>
     <string id="BpmUnit">bpm</string>
     <string id="PctUnit">%</string>
+    <string id="Climb">爬坡</string>
+    <string id="BestClimb">最佳</string>
+    <string id="RiderKgTitle">骑手体重 (kg)</string>
+    <string id="RiderKgPrompt">0 = 使用 Garmin 个人资料中的体重。爬坡功率需要体重。</string>
+    <string id="BikeKgTitle">车 + 装备重量 (kg)</string>
+    <string id="CdaTitle">风阻面积 CdA (m2)，爬坡姿势</string>
+    <string id="CrrTitle">滚动阻力系数 Crr</string>
+    <string id="EfficiencyTitle">传动效率 (0-1)</string>
+    <string id="TempCTitle">气温 (C)，用于计算空气密度</string>
+    <string id="ClimbPowerLabel">最佳爬坡虚拟功率</string>
+    <string id="ClimbPowerLowLabel">最佳爬坡功率（低情景）</string>
+    <string id="ClimbPowerHighLabel">最佳爬坡功率（高情景）</string>
+    <string id="ClimbDurationLabel">最佳爬坡时长</string>
+    <string id="ClimbGradeLabel">最佳爬坡坡度</string>
+    <string id="WattUnit">W</string>
+    <string id="MinUnit">分钟</string>
 </strings>

@@ -11,9 +11,28 @@ const WINDOW_SECONDS = [1200, 1800, 2400, 3600];
 const WINDOW_LABELS = ["20'", "30'", "40'", "60'"];
 const ZONE_COLORS = [Graphics.COLOR_LT_GRAY, Graphics.COLOR_BLUE, Graphics.COLOR_GREEN, Graphics.COLOR_ORANGE, Graphics.COLOR_RED];
 const DOMAIN_COLORS = [Graphics.COLOR_BLUE, Graphics.COLOR_ORANGE, Graphics.COLOR_RED];
+const ROW_FONTS = [Graphics.FONT_SMALL, Graphics.FONT_TINY, Graphics.FONT_XTINY];
+const ROW_PAD = 8;
+
+//! Largest row font, and the full value if it fits beside the label, else the
+//! short value. Returns [font, value].
+function fitRow(dc as Graphics.Dc, width as Number, label as String, full as String, short as String) as Array {
+    for (var f = 0; f < ROW_FONTS.size(); f++) {
+        var font = ROW_FONTS[f];
+        var labelW = dc.getTextWidthInPixels(label, font) + 3 * ROW_PAD;
+        if (labelW + dc.getTextWidthInPixels(full, font) <= width) {
+            return [font, full];
+        }
+        if (labelW + dc.getTextWidthInPixels(short, font) <= width) {
+            return [font, short];
+        }
+    }
+    return [ROW_FONTS[ROW_FONTS.size() - 1], short];
+}
 
 //! Live HR zones from the athlete's own VT1/LTHR, time in the three
-//! physiological domains, and best sustained 20-60 minute HR windows.
+//! physiological domains, best sustained 20-60 minute HR windows, and
+//! physics-model virtual power on steady climbs.
 class HrThresholdsField extends WatchUi.DataField {
     private var _tracker as HrModel.Tracker;
     private var _vt1 as Number = 0;
@@ -22,19 +41,28 @@ class HrThresholdsField extends WatchUi.DataField {
     private var _fromProfile as Boolean = false;
     private var _configError as Boolean = false;
     private var _hr as Number? = null;
+    private var _climbs as ClimbModel.Detector;
+    private var _climbBase as ClimbModel.Params? = null;
+    private var _tempC as Float = 20.0;
 
     private var _fitBest as Array<FitContributor.Field?>;
     private var _fitDomain as Array<FitContributor.Field?>;
+    private var _fitClimb as Array<FitContributor.Field?>;
 
     private var _strNoHr as String;
     private var _strSetup as String;
     private var _strConfigError as String;
     private var _strDomains as Array<String>;
+    private var _strClimb as String;
+    private var _strBestClimb as String;
 
     //! @param recordFit false only in unit tests, where no FIT session exists
     public function initialize(recordFit as Boolean) {
         DataField.initialize();
         _tracker = new HrModel.Tracker(WINDOW_SECONDS, 12);
+        _climbs = new ClimbModel.Detector(12);
+        _strClimb = WatchUi.loadResource(Rez.Strings.Climb) as String;
+        _strBestClimb = WatchUi.loadResource(Rez.Strings.BestClimb) as String;
         _strNoHr = WatchUi.loadResource(Rez.Strings.NoHr) as String;
         _strSetup = WatchUi.loadResource(Rez.Strings.Setup) as String;
         _strConfigError = WatchUi.loadResource(Rez.Strings.ConfigError) as String;
@@ -45,6 +73,7 @@ class HrThresholdsField extends WatchUi.DataField {
         ];
         _fitBest = [null, null, null, null];
         _fitDomain = [null, null, null];
+        _fitClimb = [null, null, null, null, null];
         if (recordFit) {
             createFitFields();
         }
@@ -63,6 +92,14 @@ class HrThresholdsField extends WatchUi.DataField {
             createField("pct_vt1_to_lthr", 5, FitContributor.DATA_TYPE_UINT8, {:mesgType => FitContributor.MESG_TYPE_SESSION, :units => "%"}),
             createField("pct_above_lthr", 6, FitContributor.DATA_TYPE_UINT8, {:mesgType => FitContributor.MESG_TYPE_SESSION, :units => "%"}),
         ];
+        // Data fields get 32 bytes per FIT message: 4x4 + 3x1 + 3x2 + 2 + 4 = 31.
+        _fitClimb = [
+            createField("climb_virtual_power", 7, FitContributor.DATA_TYPE_UINT16, {:mesgType => FitContributor.MESG_TYPE_SESSION, :units => "W"}),
+            createField("climb_virtual_power_low", 8, FitContributor.DATA_TYPE_UINT16, {:mesgType => FitContributor.MESG_TYPE_SESSION, :units => "W"}),
+            createField("climb_virtual_power_high", 9, FitContributor.DATA_TYPE_UINT16, {:mesgType => FitContributor.MESG_TYPE_SESSION, :units => "W"}),
+            createField("climb_duration", 10, FitContributor.DATA_TYPE_UINT16, {:mesgType => FitContributor.MESG_TYPE_SESSION, :units => "min"}),
+            createField("climb_grade", 11, FitContributor.DATA_TYPE_FLOAT, {:mesgType => FitContributor.MESG_TYPE_SESSION, :units => "%"}),
+        ];
     }
 
     //! Re-read thresholds; called at start and whenever settings change in Garmin Connect.
@@ -71,6 +108,8 @@ class HrThresholdsField extends WatchUi.DataField {
         _lthr = readNumber("LTHR");
         var maxGap = readNumber("MaxGap");
         _tracker.maxGap = maxGap > 0 ? maxGap : 12;
+        _climbs.maxGap = _tracker.maxGap;
+        loadClimbSettings();
         _configError = false;
         _fromProfile = false;
         _lowers = null;
@@ -95,12 +134,59 @@ class HrThresholdsField extends WatchUi.DataField {
         return value instanceof Number ? value : 0;
     }
 
+    private function readFloat(key as String, fallback as Float) as Float {
+        var value = Application.Properties.getValue(key);
+        if (value instanceof Float || value instanceof Number) {
+            return value.toFloat();
+        }
+        return fallback;
+    }
+
+    //! System mass = rider (setting, else Garmin profile) + bike. Without a
+    //! rider mass the climb model stays off rather than assuming one.
+    private function loadClimbSettings() as Void {
+        var riderKg = readFloat("RiderKg", 0.0);
+        if (riderKg <= 0) {
+            var grams = UserProfile.getProfile().weight;
+            riderKg = grams == null ? 0.0 : grams / 1000.0;
+        }
+        _tempC = readFloat("TempC", 20.0);
+        var base = null as ClimbModel.Params?;
+        if (riderKg > 0) {
+            base = new ClimbModel.Params(riderKg + readFloat("BikeKg", 9.0), readFloat("CdA", 0.32),
+                readFloat("Crr", 0.005), readFloat("Efficiency", 0.975), 0.0, 1.2);
+        }
+        _climbBase = base;
+        _climbs.params = base;
+    }
+
     public function compute(info as Activity.Info) as Void {
         _hr = info.currentHeartRate;
         if (info.timerState != Activity.TIMER_STATE_ON) {
+            _climbs.interrupt();
             return;
         }
-        _tracker.addSample(Time.now().value(), _hr);
+        var now = Time.now().value();
+        _tracker.addSample(now, _hr);
+        var base = _climbBase;
+        var altitude = info.altitude;
+        if (base != null && altitude != null) {
+            var pressure = info.ambientPressure;
+            base.airDensity = ClimbModel.airDensity(pressure != null ? pressure : ClimbModel.isaPressure(altitude), _tempC);
+        }
+        _climbs.addSample(now, info.elapsedDistance, altitude, info.currentPower);
+        var best = _climbs.best;
+        if (best != null) {
+            var values = [rounded(best.powerW[1]), rounded(best.powerW[0]), rounded(best.powerW[2]),
+                (best.durationS + 30) / 60, best.gradePct()];
+            for (var c = 0; c < _fitClimb.size(); c++) {
+                var field = _fitClimb[c];
+                var value = values[c];
+                if (field != null && value != null) {
+                    field.setData(value);
+                }
+            }
+        }
         for (var i = 0; i < _fitBest.size(); i++) {
             var value = _tracker.best[i];
             var field = _fitBest[i];
@@ -117,10 +203,17 @@ class HrThresholdsField extends WatchUi.DataField {
         }
     }
 
+    private function rounded(value as Float?) as Number? {
+        return value == null ? null : (value + 0.5).toNumber();
+    }
+
     public function onTimerReset() as Void {
         _tracker = new HrModel.Tracker(WINDOW_SECONDS, _tracker.maxGap);
         _tracker.vt1 = _vt1;
         _tracker.lthr = _lthr;
+        var params = _climbs.params;
+        _climbs = new ClimbModel.Detector(_tracker.maxGap);
+        _climbs.params = params;
     }
 
     public function onUpdate(dc as Graphics.Dc) as Void {
@@ -165,6 +258,27 @@ class HrThresholdsField extends WatchUi.DataField {
             text += delta >= 0 ? " (+" + delta + ")" : " (" + delta + ")";
         }
         return text;
+    }
+
+    //! "245 W 228-262" for a climb, or just "245 W" without the range.
+    private function climbText(climb as ClimbModel.Climb, withRange as Boolean) as String {
+        var p = climb.powerW;
+        var base = p[1];
+        if (base == null) {
+            return "--";
+        }
+        var text = base.format("%.0f") + " W";
+        var low = p[0];
+        var high = p[2];
+        if (withRange && low != null && high != null) {
+            text += " " + low.format("%.0f") + "-" + high.format("%.0f");
+        }
+        return text;
+    }
+
+    private function climbLabel(prefix as String, climb as ClimbModel.Climb) as String {
+        var label = prefix + " " + (climb.durationS / 60) + "' " + climb.gradePct().format("%.1f") + "%";
+        return climb.inFtpWindow() ? label + "*" : label;
     }
 
     //! Coloured zone badge, e.g. "Z3"; returns its width.
@@ -238,7 +352,9 @@ class HrThresholdsField extends WatchUi.DataField {
         var labelH = Graphics.getFontHeight(labelFont);
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
         dc.drawText(6, 2, labelFont, "HR", Graphics.TEXT_JUSTIFY_LEFT);
-        dc.drawText(w - 6, 2, labelFont, WINDOW_LABELS[0] + " " + bestText(0), Graphics.TEXT_JUSTIFY_RIGHT);
+        var climbing = _climbs.current();
+        var corner = climbing == null ? WINDOW_LABELS[0] + " " + bestText(0) : _strClimb + " " + climbText(climbing, false);
+        dc.drawText(w - 6, 2, labelFont, corner, Graphics.TEXT_JUSTIFY_RIGHT);
 
         var font = Graphics.FONT_NUMBER_MEDIUM;
         var text = hrText();
@@ -284,17 +400,34 @@ class HrThresholdsField extends WatchUi.DataField {
         var rowFont = Graphics.FONT_SMALL;
         var rowH = Graphics.getFontHeight(rowFont);
         var rowsTop = barY + 12 + labelH + 6;
-        var rows = WINDOW_SECONDS.size();
+        // 20' and 60' HR always; 30'/40' only stay in the FIT file. Climb rows follow.
+        var labels = [WINDOW_LABELS[0], WINDOW_LABELS[3]];
+        var values = [bestText(0), bestText(3)];
+        var shorts = [values[0], values[1]];
+        var climbing = _climbs.current();
+        if (climbing != null) {
+            labels.add(climbLabel(_strClimb, climbing));
+            values.add(climbText(climbing, true));
+            shorts.add(climbText(climbing, false));
+        }
+        var best = _climbs.best;
+        if (best != null) {
+            labels.add(climbLabel(_strBestClimb, best));
+            values.add(climbText(best, true));
+            shorts.add(climbText(best, false));
+        }
+        var rows = labels.size();
         var rowStep = (h - rowsTop - 2) / rows;
         if (rowStep < rowH) {
             rows = (h - rowsTop - 2) / rowH;
             rowStep = rowH;
         }
         dc.setColor(fg, Graphics.COLOR_TRANSPARENT);
-        for (var i = 0; i < rows && i < WINDOW_SECONDS.size(); i++) {
+        for (var i = 0; i < rows && i < labels.size(); i++) {
             var rowY = rowsTop + i * rowStep;
-            dc.drawText(w / 4, rowY, rowFont, WINDOW_LABELS[i], Graphics.TEXT_JUSTIFY_CENTER);
-            dc.drawText(w * 5 / 8, rowY, rowFont, bestText(i), Graphics.TEXT_JUSTIFY_CENTER);
+            var fit = fitRow(dc, w, labels[i], values[i], shorts[i]);
+            dc.drawText(ROW_PAD, rowY, fit[0], labels[i], Graphics.TEXT_JUSTIFY_LEFT);
+            dc.drawText(w - ROW_PAD, rowY, fit[0], fit[1], Graphics.TEXT_JUSTIFY_RIGHT);
         }
     }
 }
