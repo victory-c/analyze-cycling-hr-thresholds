@@ -1,0 +1,9 @@
+<fitContributions>
+    <fitField id="0" displayInActivitySummary="true" sortOrder="0" precision="1" dataLabel="@Strings.Best20Label" unitLabel="@Strings.BpmUnit" />
+    <fitField id="1" displayInActivitySummary="true" sortOrder="1" precision="1" dataLabel="@Strings.Best30Label" unitLabel="@Strings.BpmUnit" />
+    <fitField id="2" displayInActivitySummary="true" sortOrder="2" precision="1" dataLabel="@Strings.Best40Label" unitLabel="@Strings.BpmUnit" />
+    <fitField id="3" displayInActivitySummary="true" sortOrder="3" precision="1" dataLabel="@Strings.Best60Label" unitLabel="@Strings.BpmUnit" />
+    <fitField id="4" displayInActivitySummary="true" sortOrder="4" precision="0" dataLabel="@Strings.PctLowLabel" unitLabel="@Strings.PctUnit" />
+    <fitField id="5" displayInActivitySummary="true" sortOrder="5" precision="0" dataLabel="@Strings.PctMidLabel" unitLabel="@Strings.PctUnit" />
+    <fitField id="6" displayInActivitySummary="true" sortOrder="6" precision="0" dataLabel="@Strings.PctHighLabel" unitLabel="@Strings.PctUnit" />
+</fitContributions>

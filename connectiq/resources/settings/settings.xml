@@ -1,0 +1,11 @@
+<settings>
+    <setting propertyKey="@Properties.VT1" title="@Strings.Vt1Title" prompt="@Strings.Vt1Prompt">
+        <settingConfig type="numeric" min="0" max="260" />
+    </setting>
+    <setting propertyKey="@Properties.LTHR" title="@Strings.LthrTitle" prompt="@Strings.LthrPrompt">
+        <settingConfig type="numeric" min="0" max="260" />
+    </setting>
+    <setting propertyKey="@Properties.MaxGap" title="@Strings.MaxGapTitle">
+        <settingConfig type="numeric" min="1" max="60" />
+    </setting>
+</settings>

@@ -1,0 +1,25 @@
+<strings>
+    <string id="AppName">心率阈值</string>
+    <string id="Setup">请在应用设置中填写 VT1 和 LTHR</string>
+    <string id="ConfigError">需满足 VT1 &lt; LTHR</string>
+
+    <string id="Vt1Title">VT1 / 有氧阈心率 (bpm)</string>
+    <string id="Vt1Prompt">0 = 未设置。用实验室 VT1/GET 或可靠的路测估计。</string>
+    <string id="LthrTitle">骑行乳酸阈心率 LTHR / LT2 (bpm)</string>
+    <string id="LthrPrompt">0 = 未设置。必须是骑行（不是跑步）的阈值。</string>
+    <string id="MaxGapTitle">可插值的最大心率断点 (秒)</string>
+
+    <string id="Best20Label">最佳 20 分钟心率</string>
+    <string id="Best30Label">最佳 30 分钟心率</string>
+    <string id="Best40Label">最佳 40 分钟心率</string>
+    <string id="Best60Label">最佳 60 分钟心率</string>
+    <string id="PctLowLabel">VT1 以下时间</string>
+    <string id="PctMidLabel">VT1 至 LTHR 时间</string>
+    <string id="PctHighLabel">LTHR 及以上时间</string>
+    <string id="NoHr">--</string>
+    <string id="DomainLow">&lt;VT1</string>
+    <string id="DomainMid">VT1-LT</string>
+    <string id="DomainHigh">&gt;LT</string>
+    <string id="BpmUnit">bpm</string>
+    <string id="PctUnit">%</string>
+</strings>

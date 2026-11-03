@@ -1,0 +1,5 @@
+<properties>
+    <property id="VT1" type="number">0</property>
+    <property id="LTHR" type="number">0</property>
+    <property id="MaxGap" type="number">12</property>
+</properties>

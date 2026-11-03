@@ -1,0 +1,25 @@
+<strings>
+    <string id="AppName">HR Thresholds</string>
+    <string id="NoHr">--</string>
+    <string id="Setup">Set VT1 + LTHR in app settings</string>
+    <string id="ConfigError">Check VT1 &lt; LTHR</string>
+    <string id="DomainLow">&lt;VT1</string>
+    <string id="DomainMid">VT1-LT</string>
+    <string id="DomainHigh">&gt;LT</string>
+
+    <string id="Vt1Title">VT1 / aerobic threshold HR (bpm)</string>
+    <string id="Vt1Prompt">0 = not set. Use a lab VT1/GET or a defensible field estimate.</string>
+    <string id="LthrTitle">Cycling LTHR / LT2 HR (bpm)</string>
+    <string id="LthrPrompt">0 = not set. Must be a cycling (not running) threshold.</string>
+    <string id="MaxGapTitle">Max HR gap to interpolate (s)</string>
+
+    <string id="Best20Label">Best 20 min HR</string>
+    <string id="Best30Label">Best 30 min HR</string>
+    <string id="Best40Label">Best 40 min HR</string>
+    <string id="Best60Label">Best 60 min HR</string>
+    <string id="PctLowLabel">Time below VT1</string>
+    <string id="PctMidLabel">Time VT1 to LTHR</string>
+    <string id="PctHighLabel">Time at/above LTHR</string>
+    <string id="BpmUnit">bpm</string>
+    <string id="PctUnit">%</string>
+</strings>
