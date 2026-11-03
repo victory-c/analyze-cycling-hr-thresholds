@@ -42,7 +42,6 @@ class HrThresholdsField extends WatchUi.DataField {
     private var _configError as Boolean = false;
     private var _hr as Number? = null;
     private var _climbs as ClimbModel.Detector;
-    private var _climbBase as ClimbModel.Params? = null;
     private var _tempC as Float = 20.0;
 
     private var _fitBest as Array<FitContributor.Field?>;
@@ -156,37 +155,27 @@ class HrThresholdsField extends WatchUi.DataField {
             base = new ClimbModel.Params(riderKg + readFloat("BikeKg", 9.0), readFloat("CdA", 0.32),
                 readFloat("Crr", 0.005), readFloat("Efficiency", 0.975), 0.0, 1.2);
         }
-        _climbBase = base;
         _climbs.params = base;
     }
 
     public function compute(info as Activity.Info) as Void {
         _hr = info.currentHeartRate;
         if (info.timerState != Activity.TIMER_STATE_ON) {
+            // Stopping at a summit closes the climb here; record it before the save.
             _climbs.interrupt();
+            writeClimbFit();
             return;
         }
         var now = Time.now().value();
         _tracker.addSample(now, _hr);
-        var base = _climbBase;
         var altitude = info.altitude;
-        if (base != null && altitude != null) {
+        var density = 1.2;
+        if (altitude != null) {
             var pressure = info.ambientPressure;
-            base.airDensity = ClimbModel.airDensity(pressure != null ? pressure : ClimbModel.isaPressure(altitude), _tempC);
+            density = ClimbModel.airDensity(pressure != null ? pressure : ClimbModel.isaPressure(altitude), _tempC);
         }
-        _climbs.addSample(now, info.elapsedDistance, altitude, info.currentPower);
-        var best = _climbs.best;
-        if (best != null) {
-            var values = [rounded(best.powerW[1]), rounded(best.powerW[0]), rounded(best.powerW[2]),
-                (best.durationS + 30) / 60, best.gradePct()];
-            for (var c = 0; c < _fitClimb.size(); c++) {
-                var field = _fitClimb[c];
-                var value = values[c];
-                if (field != null && value != null) {
-                    field.setData(value);
-                }
-            }
-        }
+        _climbs.addSample(now, info.elapsedDistance, altitude, info.currentPower, density);
+        writeClimbFit();
         for (var i = 0; i < _fitBest.size(); i++) {
             var value = _tracker.best[i];
             var field = _fitBest[i];
@@ -199,6 +188,23 @@ class HrThresholdsField extends WatchUi.DataField {
             var field = _fitDomain[d];
             if (pct != null && field != null) {
                 field.setData(pct);
+            }
+        }
+    }
+
+    private function writeClimbFit() as Void {
+        var best = _climbs.best;
+        if (best == null) {
+            return;
+        }
+        // Whole minutes, truncated like the on-screen label.
+        var values = [rounded(best.powerW[1]), rounded(best.powerW[0]), rounded(best.powerW[2]),
+            best.durationS / 60, best.gradePct()];
+        for (var c = 0; c < _fitClimb.size(); c++) {
+            var field = _fitClimb[c];
+            var value = values[c];
+            if (field != null && value != null) {
+                field.setData(value);
             }
         }
     }
@@ -260,20 +266,23 @@ class HrThresholdsField extends WatchUi.DataField {
         return text;
     }
 
-    //! "245 W 228-262" for a climb, or just "245 W" without the range.
-    private function climbText(climb as ClimbModel.Climb, withRange as Boolean) as String {
+    //! "245 W 228-262" in full; "228-262 W" when space is short, so the
+    //! modelled value is never shown without its range. With a power meter
+    //! covering the climb, its reading replaces the model.
+    private function climbText(climb as ClimbModel.Climb, full as Boolean) as String {
+        var measured = climb.measuredW;
+        if (measured != null) {
+            return "PM " + measured.format("%.0f") + " W";
+        }
         var p = climb.powerW;
         var base = p[1];
-        if (base == null) {
-            return "--";
-        }
-        var text = base.format("%.0f") + " W";
         var low = p[0];
         var high = p[2];
-        if (withRange && low != null && high != null) {
-            text += " " + low.format("%.0f") + "-" + high.format("%.0f");
+        if (base == null || low == null || high == null) {
+            return "--";
         }
-        return text;
+        var range = low.format("%.0f") + "-" + high.format("%.0f");
+        return full ? base.format("%.0f") + " W " + range : range + " W";
     }
 
     private function climbLabel(prefix as String, climb as ClimbModel.Climb) as String {

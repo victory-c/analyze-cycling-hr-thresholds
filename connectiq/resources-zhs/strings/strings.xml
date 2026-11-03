@@ -32,8 +32,8 @@
     <string id="EfficiencyTitle">传动效率 (0-1)</string>
     <string id="TempCTitle">气温 (C)，用于计算空气密度</string>
     <string id="ClimbPowerLabel">最佳爬坡虚拟功率</string>
-    <string id="ClimbPowerLowLabel">最佳爬坡功率（低情景）</string>
-    <string id="ClimbPowerHighLabel">最佳爬坡功率（高情景）</string>
+    <string id="ClimbPowerLowLabel">最佳爬坡虚拟功率（低情景）</string>
+    <string id="ClimbPowerHighLabel">最佳爬坡虚拟功率（高情景）</string>
     <string id="ClimbDurationLabel">最佳爬坡时长</string>
     <string id="ClimbGradeLabel">最佳爬坡坡度</string>
     <string id="WattUnit">W</string>

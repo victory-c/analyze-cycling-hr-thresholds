@@ -1,15 +1,19 @@
 # HR Thresholds — Connect IQ data field
 
 The on-bike half of this skill. It runs the same zone model as
-`scripts/calculate_hr_zones.py` and the same best-window rules as
-`scripts/analyze_field_hr.py` live on a Garmin Edge, so every ride records the
-evidence the desktop analysis looks for.
+`scripts/calculate_hr_zones.py`, the same best-window rules as
+`scripts/analyze_field_hr.py` and the same steady-climb physics as
+`climb_power()` in `scripts/estimate_ftp_without_power_meter.py` live on a
+Garmin Edge, so every ride records the evidence the desktop analysis looks for.
+Everything on the device is deterministic arithmetic; the judgement calls
+(which efforts count, what the thresholds are) stay with the skill.
 
 | On screen | Saved to the FIT session |
 |---|---|
 | Current HR + Z1–Z5 badge (dual-threshold model) | Best 20 / 30 / 40 / 60 min HR |
 | Time below VT1 / VT1–LTHR / at or above LTHR | % time in each of the three domains |
 | Best 20–60 min HR and its gap to LTHR | |
+| Climb virtual power, low–high range (live and best climb) | Best climb power (base, low, high), duration, grade |
 
 The layout adapts to the field size: one-line, half-page and full-page.
 
@@ -24,13 +28,48 @@ The layout adapts to the field size: one-line, half-page and full-page.
 - Thresholds are never inferred. With VT1/LTHR unset the field colours by the
   rider's Garmin cycling zones and shows a setup prompt instead of domains.
 
+## Climb virtual power
+
+No heart rate is involved. On a steady climb the field estimates crank power
+from physics, exactly as `climb_power()` does:
+
+`P = v × (m g sin θ + m g Crr cos θ + ½ ρ CdA v_air |v_air|) / efficiency`
+
+- **Detection:** a climb starts when the trailing 60 s grade reaches 4 % and
+  ends when it drops below 2 %, the rider falls 15 m below the summit, covers
+  under 30 m in 60 s (a stop with auto-pause off), pauses, or loses samples
+  for longer than `MaxGap`. It runs from the last low point before the climb to
+  the first time it reached its summit. Climbs under 10 min are not kept.
+- **Inputs:** distance, barometric altitude, rider mass (setting, else the
+  Garmin profile; with neither the feature stays off), bike mass, CdA, Crr,
+  drivetrain efficiency, and air density from barometric pressure and the
+  temperature setting (mean of the start and summit values).
+- **Range, always shown:** low/high scenarios move every uncertain input the
+  same way: CdA ±0.04 m², Crr ±0.001, efficiency ∓1.5 pts, 2 m/s tail/headwind,
+  mass ±1 kg, elevation gain ±3 %. When space is short the screen shows the
+  range (`228-262 W`), never the base value alone.
+- **Not modelled:** drafting, acceleration, braking, cornering, wind beyond the
+  ±2 m/s scenario. Ride climbs solo and steadily for usable numbers.
+- **Not FTP.** `*` after a climb marks a 40–70 min climb, the only duration the
+  skill accepts as an FTP proxy, and only if the effort was maximal, steady and
+  solo, which the device cannot judge.
+- **Power meter:** if one covers ≥90 % of the climb, the screen shows its
+  reading (`PM 240 W`) instead; the FIT fields keep the modelled values so the
+  two can be compared afterwards.
+
 ## Settings (Garmin Connect → device → Connect IQ → HR Thresholds)
 
 | Key | Meaning | Default |
 |---|---|---|
 | `VT1` | VT1/GET heart rate, bpm | 0 (unset) |
 | `LTHR` | Cycling LTHR/LT2, bpm | 0 (unset) |
-| `MaxGap` | Longest HR gap to interpolate, seconds | 12 |
+| `MaxGap` | Longest HR/sample gap to bridge, seconds | 12 |
+| `RiderKg` | Rider mass, kg (0 = Garmin profile weight) | 0 |
+| `BikeKg` | Bike + kit mass, kg | 9 |
+| `CdA` | Drag area in climbing position, m² | 0.32 |
+| `Crr` | Rolling resistance coefficient | 0.005 |
+| `Efficiency` | Drivetrain efficiency | 0.975 |
+| `TempC` | Air temperature for density, °C | 20 |
 
 ## Build
 

@@ -192,18 +192,18 @@ function rideClimb(detector as ClimbModel.Detector, climbSeconds as Number, flat
     var a = 100.0;
     var t = 0;
     for (var i = 0; i < 120; i++) {
-        detector.addSample(t, d, a, power);
+        detector.addSample(t, d, a, power, 1.2);
         t++;
         d += 8.0;
     }
     for (var i = 0; i < climbSeconds; i++) {
-        detector.addSample(t, d, a, power);
+        detector.addSample(t, d, a, power, 1.2);
         t++;
         d += 4.0;
         a += 0.24;
     }
     for (var i = 0; i < flatSeconds; i++) {
-        detector.addSample(t, d, a, power);
+        detector.addSample(t, d, a, power, 1.2);
         t++;
         d += 8.0;
     }
@@ -251,13 +251,13 @@ function testLongGapEndsClimb(logger as Test.Logger) as Boolean {
     var d = 0.0;
     var a = 100.0;
     for (var t = 0; t < 400; t++) {
-        detector.addSample(t, d, a, null);
+        detector.addSample(t, d, a, null, 1.2);
         d += 4.0;
         a += 0.24;
     }
     Test.assert(detector.current() != null);
     // A 60 s gap (e.g. a stop with auto-pause off and no samples) closes it.
-    detector.addSample(460, d, a, null);
+    detector.addSample(460, d, a, null, 1.2);
     Test.assert(detector.current() == null);
     return true;
 }
@@ -310,5 +310,53 @@ function testWorstCaseClimbRowFitsScreen(logger as Test.Logger) as Boolean {
         logger.debug(labels[i] + " -> '" + fit[1] + "' width " + total + " / " + w);
         Test.assert(total <= w);
     }
+    return true;
+}
+
+(:test)
+function testStandingAtSummitIsNotClimbTime(logger as Test.Logger) as Boolean {
+    // Auto-pause off: 900 s climb, then 600 s standing still with barometric
+    // noise. The climb must close at its first summit, not after the stop.
+    var detector = new ClimbModel.Detector(12);
+    detector.params = climbParams();
+    var d = 0.0;
+    var a = 100.0;
+    var t = 0;
+    for (var i = 0; i < 900; i++) {
+        detector.addSample(t, d, a, null, 1.2);
+        t++;
+        d += 4.0;
+        a += 0.24;
+    }
+    var summit = a;
+    for (var i = 0; i < 600; i++) {
+        detector.addSample(t, d, summit + (i % 7) * 0.1, null, 1.2);
+        t++;
+    }
+    Test.assert(detector.current() == null);
+    var climb = detector.best as ClimbModel.Climb;
+    logger.debug("summit stop climb: " + climb.durationS + " s");
+    Test.assert(climb.durationS <= 900);
+    Test.assert(near(climb.powerW[1], 232.2, 1.0));
+    return true;
+}
+
+(:test)
+function testClimbUsesMeanOfStartAndSummitDensity(logger as Test.Logger) as Boolean {
+    var detector = new ClimbModel.Detector(12);
+    detector.params = climbParams();
+    var d = 0.0;
+    var a = 100.0;
+    // Density falls linearly from 1.25 at the bottom to 1.15 at the top.
+    for (var t = 0; t < 1080; t++) {
+        var climbing = t >= 120 && t < 1020;
+        var progress = t < 120 ? 0.0 : (t >= 1020 ? 1.0 : (t - 120) / 900.0);
+        detector.addSample(t, d, a, null, 1.25 - 0.1 * progress);
+        d += climbing ? 4.0 : 8.0;
+        a += climbing ? 0.24 : 0.0;
+    }
+    var climb = detector.best as ClimbModel.Climb;
+    // Python: climb_power(84, 3600, 216, 900, 0.32, 0.005, 1.2, 0, 0.975) -> 232.2 W
+    Test.assert(near(climb.powerW[1], 232.2, 0.3));
     return true;
 }

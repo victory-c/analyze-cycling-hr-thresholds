@@ -112,13 +112,16 @@ module ClimbModel {
     //! Finds steady climbs from 1 Hz distance and barometric altitude.
     //! A climb starts when the trailing 60 s grade reaches 4 % and ends when it
     //! falls below 2 %, the rider drops 15 m below the climb's high point, the
-    //! timer pauses, or samples stop for longer than maxGap. The segment is
-    //! trimmed to its highest point so a flat run-out is not counted.
+    //! rider covers under 30 m in 60 s (stopped without auto-pause), the timer
+    //! pauses, or samples stop for longer than maxGap. The segment runs from the
+    //! last low point before the climb to the first time it reached its summit,
+    //! so flat road and standing time on either side are not counted.
     class Detector {
         public const WINDOW = 61;
         public const START_GRADE = 0.04;
         public const END_GRADE = 0.02;
         public const MIN_WINDOW_DISTANCE = 100.0;
+        public const STALL_DISTANCE = 30.0;
         public const MAX_DROP_M = 15.0;
         public const MIN_CLIMB_S = 600;
 
@@ -130,6 +133,7 @@ module ClimbModel {
         private var _d as Array<Float>;
         private var _a as Array<Float>;
         private var _p as Array<Number?>;
+        private var _rho as Array<Float>;
         private var _count as Number = 0;
         private var _head as Number = 0;
         private var _lastT as Number? = null;
@@ -138,6 +142,9 @@ module ClimbModel {
         private var _startT as Number = 0;
         private var _startD as Float = 0.0;
         private var _startA as Float = 0.0;
+        private var _startRho as Float = 0.0;
+        private var _topRho as Float = 0.0;
+        private var _nowRho as Float = 0.0;
         private var _topT as Number = 0;
         private var _topD as Float = 0.0;
         private var _topA as Float = 0.0;
@@ -155,10 +162,12 @@ module ClimbModel {
             _d = new Array<Float>[WINDOW];
             _a = new Array<Float>[WINDOW];
             _p = new Array<Number?>[WINDOW];
+            _rho = new Array<Float>[WINDOW];
         }
 
-        //! Feed one sample. power is from a power meter when present, else null.
-        public function addSample(t as Number, distanceM as Float?, altitudeM as Float?, power as Number?) as Void {
+        //! Feed one sample. power is from a power meter when present, else null;
+        //! density is the current air density in kg/m3.
+        public function addSample(t as Number, distanceM as Float?, altitudeM as Float?, power as Number?, density as Float) as Void {
             if (distanceM == null || altitudeM == null) {
                 return;
             }
@@ -176,13 +185,19 @@ module ClimbModel {
             _d[_head] = distanceM;
             _a[_head] = altitudeM;
             _p[_head] = power;
+            _rho[_head] = density;
             _head = (_head + 1) % WINDOW;
             if (_count < WINDOW) {
                 _count++;
             }
 
             if (_inClimb) {
-                extend(t, distanceM, altitudeM, power);
+                extend(t, distanceM, altitudeM, power, density);
+                var moved = windowDistance();
+                if (moved != null && moved < STALL_DISTANCE) {
+                    finish();
+                    return;
+                }
             }
             var grade = trailingGrade();
             if (grade == null) {
@@ -204,6 +219,9 @@ module ClimbModel {
                 _startT = _t[start];
                 _startD = _d[start];
                 _startA = _a[start];
+                _startRho = _rho[start];
+                _topRho = density;
+                _nowRho = density;
                 _topT = t;
                 _topD = distanceM;
                 _topA = altitudeM;
@@ -227,34 +245,44 @@ module ClimbModel {
             }
         }
 
-        private function extend(t as Number, distanceM as Float, altitudeM as Float, power as Number?) as Void {
+        private function extend(t as Number, distanceM as Float, altitudeM as Float, power as Number?, density as Float) as Void {
             _nowT = t;
+            _nowRho = density;
             _nowD = distanceM;
             _nowA = altitudeM;
             if (power != null && power >= 0) {
                 _powerSum += power;
                 _powerSeconds++;
             }
-            // Strictly higher: a flat run-out at summit height must not move the end.
-            if (altitudeM > _topA) {
+            // Strictly higher and moving forward: neither a flat run-out at summit
+            // height nor barometric noise while standing may move the end.
+            if (altitudeM > _topA && distanceM >= _topD + 1.0) {
                 _topT = t;
                 _topD = distanceM;
                 _topA = altitudeM;
+                _topRho = density;
                 _topPowerSum = _powerSum;
                 _topPowerSeconds = _powerSeconds;
             }
         }
 
-        private function trailingGrade() as Float? {
+        //! Distance covered across the trailing window, or null with under 31 s of samples.
+        private function windowDistance() as Float? {
             if (_count < 31) {
                 return null;
             }
             var oldest = _count < WINDOW ? 0 : _head;
             var newest = (_head - 1 + WINDOW) % WINDOW;
-            var dist = _d[newest] - _d[oldest];
-            if (dist < MIN_WINDOW_DISTANCE) {
+            return _d[newest] - _d[oldest];
+        }
+
+        private function trailingGrade() as Float? {
+            var dist = windowDistance();
+            if (dist == null || dist < MIN_WINDOW_DISTANCE) {
                 return null;
             }
+            var oldest = _count < WINDOW ? 0 : _head;
+            var newest = (_head - 1 + WINDOW) % WINDOW;
             return (_a[newest] - _a[oldest]) / dist;
         }
 
@@ -269,7 +297,7 @@ module ClimbModel {
 
         private function finish() as Void {
             _inClimb = false;
-            var climb = segment(_topT, _topD, _topA, _topPowerSum, _topPowerSeconds);
+            var climb = segment(_topT, _topD, _topA, _topRho, _topPowerSum, _topPowerSeconds);
             if (climb == null || climb.durationS < MIN_CLIMB_S) {
                 return;
             }
@@ -280,11 +308,14 @@ module ClimbModel {
             }
         }
 
-        private function segment(endT as Number, endD as Float, endA as Float, powerSum as Number, powerSeconds as Number) as Climb? {
-            var p = params;
-            if (p == null) {
+        private function segment(endT as Number, endD as Float, endA as Float, endRho as Float, powerSum as Number, powerSeconds as Number) as Climb? {
+            var base = params;
+            if (base == null) {
                 return null;
             }
+            // One density for the whole climb, like the Python helper: the mean
+            // of the start and summit values.
+            var p = new Params(base.massKg, base.cdaM2, base.crr, base.efficiency, base.headwindMps, (_startRho + endRho) / 2.0);
             var duration = endT - _startT;
             var distance = endD - _startD;
             var gain = endA - _startA;
@@ -304,7 +335,7 @@ module ClimbModel {
             if (!_inClimb) {
                 return null;
             }
-            return segment(_nowT, _nowD, _nowA, _powerSum, _powerSeconds);
+            return segment(_nowT, _nowD, _nowA, _nowRho, _powerSum, _powerSeconds);
         }
     }
 }
