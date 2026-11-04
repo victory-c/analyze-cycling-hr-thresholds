@@ -1,0 +1,11 @@
+<properties>
+    <property id="VT1" type="number">0</property>
+    <property id="LTHR" type="number">0</property>
+    <property id="MaxGap" type="number">12</property>
+    <property id="RiderKg" type="float">0</property>
+    <property id="BikeKg" type="float">9</property>
+    <property id="CdA" type="float">0.32</property>
+    <property id="Crr" type="float">0.005</property>
+    <property id="Efficiency" type="float">0.975</property>
+    <property id="TempC" type="float">20</property>
+</properties>

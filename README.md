@@ -24,6 +24,9 @@ The central principle is simple: analyze every source independently, audit its v
 - Acquires Garmin evidence through either:
   - [`Taxuspt/garmin_mcp`](https://github.com/Taxuspt/garmin_mcp) for MCP-capable agents; or
   - an explicit read-only Garmin Connect API CLI for any agent that can execute Python and read JSON.
+- Runs on the bike as a Connect IQ data field for Garmin Edge ([`connectiq/`](connectiq/README.md)):
+  live dual-threshold zones, time below VT1 / VT1–LTHR / above LTHR, and best
+  20–60 min HR, all saved to the activity's FIT file.
 
 ## Guardrails
 
@@ -282,6 +285,7 @@ Read [the FTP proxy methodology](references/ftp-without-power-meter.md) before i
 ├── references/                     # Methodological guidance
 ├── scripts/                        # Auditable analysis utilities
 │   └── tests/                      # Unit tests
+├── connectiq/                      # Garmin Edge data field (Monkey C)
 ├── .github/                        # CI and contribution templates
 ├── CONTRIBUTING.md
 ├── CITATION.cff

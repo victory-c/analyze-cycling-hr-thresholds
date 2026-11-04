@@ -1,0 +1,29 @@
+<settings>
+    <setting propertyKey="@Properties.VT1" title="@Strings.Vt1Title" prompt="@Strings.Vt1Prompt">
+        <settingConfig type="numeric" min="0" max="260" />
+    </setting>
+    <setting propertyKey="@Properties.LTHR" title="@Strings.LthrTitle" prompt="@Strings.LthrPrompt">
+        <settingConfig type="numeric" min="0" max="260" />
+    </setting>
+    <setting propertyKey="@Properties.MaxGap" title="@Strings.MaxGapTitle">
+        <settingConfig type="numeric" min="1" max="60" />
+    </setting>
+    <setting propertyKey="@Properties.RiderKg" title="@Strings.RiderKgTitle" prompt="@Strings.RiderKgPrompt">
+        <settingConfig type="numeric" min="0" max="200" />
+    </setting>
+    <setting propertyKey="@Properties.BikeKg" title="@Strings.BikeKgTitle">
+        <settingConfig type="numeric" min="0" max="40" />
+    </setting>
+    <setting propertyKey="@Properties.CdA" title="@Strings.CdaTitle">
+        <settingConfig type="numeric" min="0" max="1" />
+    </setting>
+    <setting propertyKey="@Properties.Crr" title="@Strings.CrrTitle">
+        <settingConfig type="numeric" min="0" max="0.05" />
+    </setting>
+    <setting propertyKey="@Properties.Efficiency" title="@Strings.EfficiencyTitle">
+        <settingConfig type="numeric" min="0.5" max="1" />
+    </setting>
+    <setting propertyKey="@Properties.TempC" title="@Strings.TempCTitle">
+        <settingConfig type="numeric" min="-20" max="50" />
+    </setting>
+</settings>

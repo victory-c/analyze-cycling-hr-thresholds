@@ -6,3 +6,8 @@ work/
 private/
 .garminconnect/
 garmin_tokens.json
+
+# Connect IQ build output and signing keys
+connectiq/bin/
+*.der
+*.pem
