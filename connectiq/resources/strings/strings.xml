@@ -24,6 +24,7 @@
     <string id="PctUnit">%</string>
     <string id="Climb">Climb</string>
     <string id="BestClimb">Best</string>
+    <string id="FtpCandidate">FTP?</string>
     <string id="RiderKgTitle">Rider mass (kg)</string>
     <string id="RiderKgPrompt">0 = use the weight in your Garmin profile. Needed for climb power.</string>
     <string id="BikeKgTitle">Bike + kit mass (kg)</string>

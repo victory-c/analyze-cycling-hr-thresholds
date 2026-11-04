@@ -46,9 +46,9 @@ mass and air density. It never converts heart rate to watts.
   efficiency, wind (±2 m/s), mass and elevation gain together.
 - Drafting, accelerations and braking are not modelled. Ride solo and steady.
 - Climbs start at a 4 % grade and need 10+ minutes to count as "best".
-- `*` marks a 40–70 minute climb. Only a maximal, steady, solo effort of that
-  length is a rough FTP proxy. The field cannot know if you went all-out, so it
-  never calls the number FTP.
+- FTP candidate: a 40–70 minute climb is labelled `FTP?`. If you rode it
+  maximal, steady and solo, its power range is a rough FTP estimate. The field
+  cannot know if you went all-out, so it stays a question, not a verdict.
 - With a power meter, its reading (`PM 240 W`) is shown instead.
 - It needs your weight: set Rider mass, or it uses your Garmin profile. Defaults:
   bike + kit 9 kg, CdA 0.32 m², Crr 0.005, efficiency 0.975, 20 °C.
@@ -93,10 +93,14 @@ https://github.com/victory-c/analyze-cycling-hr-thresholds
 
 爬坡虚拟功率（与心率无关）：在稳定爬坡时，根据距离、气压计海拔、体重和空气密度，按物理公式
 （重力 + 滚阻 + 风阻）估算踏板功率，并始终显示低–高范围。不考虑跟车、加减速和刹车，请独自、
-匀速爬坡。坡度达到 4% 开始计算，10 分钟以上的爬坡才计入"最佳"。带 `*` 表示 40–70 分钟的爬坡：
-只有在全力、匀速、独自骑行时，它才可以作为粗略的 FTP 参考，码表无法判断你是否全力，所以从不把它
-称为 FTP。有功率计时直接显示功率计读数（`PM 240 W`）。需要体重：请设置骑手体重，或使用 Garmin
+匀速爬坡。坡度达到 4% 开始计算，10 分钟以上的爬坡才计入"最佳"。40–70 分钟的爬坡会标
+`FTP候选`：如果你是全力、匀速、独自骑完的，它的功率范围就是粗略的 FTP 估算。码表无法判断你是否
+全力，所以只标"候选"，不下结论。有功率计时直接显示功率计读数（`PM 240 W`）。需要体重：请设置骑手体重，或使用 Garmin
 个人资料中的体重。
+
+## What's new (1.0.1)
+
+- 40–70 minute climbs are now labelled `FTP?` (`FTP候选`) instead of `*`.
 
 ## What's new (1.0.0)
 

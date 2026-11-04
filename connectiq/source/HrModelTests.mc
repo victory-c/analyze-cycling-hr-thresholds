@@ -299,11 +299,11 @@ function testWorstCaseClimbRowFitsScreen(logger as Test.Logger) as Boolean {
     var dc = bitmap.getDc();
     // Widest realistic rows on the full-page layout, in both languages, after
     // fitRow() has dropped the range and/or shrunk the font.
-    var labels = ["Climb 68' 12.5%*", "Best 68' 12.5%*", "爬坡 68' 12.5%*", "60'"];
+    var labels = ["Climb 68' 12.5% FTP?", "Best 68' 12.5% FTP?", "爬坡 68' 12.5% FTP候选", "60'"];
     var full = "1088 W 1012-1199";
     for (var i = 0; i < labels.size(); i++) {
         var value = i == 3 ? "203 (+15)" : full;
-        var short = i == 3 ? value : "1088 W";
+        var short = i == 3 ? value : "1012-1199 W";
         var fit = fitRow(dc, w, labels[i], value, short);
         var font = fit[0] as Graphics.FontType;
         var total = dc.getTextWidthInPixels(labels[i], font) + dc.getTextWidthInPixels(fit[1] as String, font) + 3 * ROW_PAD;
