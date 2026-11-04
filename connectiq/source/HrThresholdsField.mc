@@ -54,6 +54,7 @@ class HrThresholdsField extends WatchUi.DataField {
     private var _strDomains as Array<String>;
     private var _strClimb as String;
     private var _strBestClimb as String;
+    private var _strFtp as String;
 
     //! @param recordFit false only in unit tests, where no FIT session exists
     public function initialize(recordFit as Boolean) {
@@ -62,6 +63,7 @@ class HrThresholdsField extends WatchUi.DataField {
         _climbs = new ClimbModel.Detector(12);
         _strClimb = WatchUi.loadResource(Rez.Strings.Climb) as String;
         _strBestClimb = WatchUi.loadResource(Rez.Strings.BestClimb) as String;
+        _strFtp = WatchUi.loadResource(Rez.Strings.FtpCandidate) as String;
         _strNoHr = WatchUi.loadResource(Rez.Strings.NoHr) as String;
         _strSetup = WatchUi.loadResource(Rez.Strings.Setup) as String;
         _strConfigError = WatchUi.loadResource(Rez.Strings.ConfigError) as String;
@@ -285,9 +287,12 @@ class HrThresholdsField extends WatchUi.DataField {
         return full ? base.format("%.0f") + " W " + range : range + " W";
     }
 
+    //! A 40-70 min climb is tagged "FTP?": the only duration the skill accepts
+    //! as an FTP proxy, and only if the effort was maximal, steady and solo,
+    //! which the device cannot judge, so it stays a question.
     private function climbLabel(prefix as String, climb as ClimbModel.Climb) as String {
         var label = prefix + " " + (climb.durationS / 60) + "' " + climb.gradePct().format("%.1f") + "%";
-        return climb.inFtpWindow() ? label + "*" : label;
+        return climb.inFtpWindow() ? label + " " + _strFtp : label;
     }
 
     //! Coloured zone badge, e.g. "Z3"; returns its width.

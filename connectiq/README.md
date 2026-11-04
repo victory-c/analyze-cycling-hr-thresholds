@@ -50,9 +50,11 @@ from physics, exactly as `climb_power()` does:
   range (`228-262 W`), never the base value alone.
 - **Not modelled:** drafting, acceleration, braking, cornering, wind beyond the
   ±2 m/s scenario. Ride climbs solo and steadily for usable numbers.
-- **Not FTP.** `*` after a climb marks a 40–70 min climb, the only duration the
-  skill accepts as an FTP proxy, and only if the effort was maximal, steady and
-  solo, which the device cannot judge.
+- **FTP candidate, not FTP.** A 40–70 min climb is labelled `FTP?`
+  (`FTP候选` in Chinese), for example `Best 52' 6.1% FTP?  228-262 W`. That is
+  the only duration the skill accepts as an FTP proxy, and only if the effort
+  was maximal, steady and solo, which the device cannot judge, so the label
+  stays a question.
 - **Power meter:** if one covers ≥90 % of the climb, the screen shows its
   reading (`PM 240 W`) instead; the FIT fields keep the modelled values so the
   two can be compared afterwards.

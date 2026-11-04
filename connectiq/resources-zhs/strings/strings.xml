@@ -24,6 +24,7 @@
     <string id="PctUnit">%</string>
     <string id="Climb">爬坡</string>
     <string id="BestClimb">最佳</string>
+    <string id="FtpCandidate">FTP候选</string>
     <string id="RiderKgTitle">骑手体重 (kg)</string>
     <string id="RiderKgPrompt">0 = 使用 Garmin 个人资料中的体重。爬坡功率需要体重。</string>
     <string id="BikeKgTitle">车 + 装备重量 (kg)</string>
